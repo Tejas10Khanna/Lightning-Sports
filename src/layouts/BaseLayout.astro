@@ -2,15 +2,14 @@
 // src/layouts/BaseLayout.astro
 // Wraps every page in the shared header/footer + design tokens.
 // Usage in any page: <BaseLayout title="..."><...page content...></BaseLayout>
-
+import Analytics from '@vercel/analytics/astro';
+import SpeedInsights from '@vercel/speed-insights/astro';
 export interface Props {
   title: string;
   description?: string;
 }
 const { title, description = "Lightning Sports — One place for all your sports news." } = Astro.props;
 ---
-<!DOCTYPE html>
-<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -155,5 +154,7 @@ const { title, description = "Lightning Sports — One place for all your sports
     menuToggle.setAttribute('aria-expanded', String(isOpen));
   });
 </script>
+    <SpeedInsights />
+    <Analytics />
 </body>
 </html>

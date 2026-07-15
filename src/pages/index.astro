@@ -1,13 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+// 1. Fetch posts from local markdown collection
+const allPosts = await getCollection('posts');
+
+// 2. Sort posts by date (Newest to Oldest)
+allPosts.sort((a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf());
+
+// 3. Grab exactly 5 posts to perfectly fill the 1 feature + 4 normal grid
+const latestPosts = allPosts.slice(0, 5);
+
+// 4. Helper to format date cleanly
+const formatDate = (date: Date | string) =>
+  new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+// Helper to strip raw markdown formatting and images to create a clean text excerpt
+// 1. Helper to fix ALL CAPS titles and strip random quotes
+const formatTitle = (title: string) => {
+  let clean = title.replace(/^["']|["']$/g, '');
+  // If the title is screaming in all caps, force it to Sentence case
+  if (clean === clean.toUpperCase()) {
+    clean = clean.charAt(0) + clean.slice(1).toLowerCase();
+  }
+  return clean;
+};
+
+// 2. Updated Excerpt Cleaner (now allows custom lengths)
+const generateCleanExcerpt = (body?: string, length: number = 150) => {
+  if (!body) return '';
+  return body
+    .replace(/!\[.*?\]\(.*?\)/g, '') 
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1') 
+    .replace(/[*_~>#\\]/g, '') 
+    .replace(/\s+/g, ' ') 
+    .trim()
+    .substring(0, length) + '...';
+};
+---
+
+<BaseLayout title="Lightning Sports — One place for all your sports news">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lightning Sports — One place for all your sports news</title>
 <meta name="description" content="Lightning Sports: fast, sharp coverage of cricket, football, tennis and the Olympics.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
 <style>
   :root{
     --ink:#0B1220;
@@ -316,57 +358,7 @@
     display:flex; gap:10px; align-items:flex-start; margin-top:18px; padding-top:18px; border-top:1px dashed var(--inkline);
     font-size:12.5px; color:var(--slate); line-height:1.6;
   }
-
-  /* ---------- footer ---------- */
-  footer{background:var(--ink-soft); color:var(--slate); padding:56px 0 28px; border-top:1px solid var(--inkline);}
-  .foot-grid{display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:40px; margin-bottom:44px;}
-  @media (max-width:760px){ .foot-grid{grid-template-columns:1fr; gap:32px;} }
-  .foot-grid h4{
-    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
-    color:var(--chalk); margin-bottom:16px;
-  }
-  .foot-grid p, .foot-grid a{font-size:13.5px; line-height:1.9;}
-  .foot-grid ul li a:hover{color:var(--volt);}
-  .foot-brand{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
-  .foot-brand .brand-text{font-size:17px;}
-  .foot-bottom{
-    border-top:1px solid var(--inkline); padding-top:22px;
-    display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;
-    font-size:12px; font-family:var(--font-mono);
-  }
 </style>
-</head>
-<body>
-
-<header>
-  <div class="wrap nav-row">
-    <a href="#" class="brand" aria-label="Lightning Sports home">
-      <svg class="bolt" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M15 0L0 20h9l-3 14 17-21h-10L15 0z"/>
-      </svg>
-      <span class="brand-text">LIGHTNING<br>SPORTS<span>Every field. Every score.</span></span>
-    </a>
-
-    <nav class="primary">
-      <button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="mainMenu" aria-label="Toggle menu">☰</button>
-      <ul id="mainMenu">
-        <li><a class="top-link" href="#latest">Home</a></li>
-        <li><a class="top-link" href="/category-template">Olympics</a></li>
-        <li class="has-sub">
-          <a class="top-link" href="/category-template" tabindex="0">Cricket ▾</a>
-          <div class="submenu">
-            <a href="/category-template">T20 World Cup</a>
-            <a href="/category-template">World Test Championship</a>
-          </div>
-        </li>
-        <li><a class="top-link" href="/category-template">Football</a></li>
-        <li><a class="top-link" href="/category-template">Tennis</a></li>
-        <li><a class="top-link" href="/about-us">About Us</a></li>
-        <li><a class="top-link join-btn" href="/join-us">Join Us</a></li>
-      </ul>
-    </nav>
-  </div>
-</header>
 
 <section class="hero">
   <div class="wrap">
@@ -381,7 +373,14 @@
 
   <div class="ticker" role="marquee" aria-label="Latest headlines ticker">
     <div class="ticker-label"><span class="dot"></span>Headlines</div>
-    <div class="ticker-track" id="tickerTrack"><!-- filled by JS --></div>
+    <div class="ticker-track">
+      {[...latestPosts, ...latestPosts].map((post) => (
+          <span class="item">
+            <b>●</b>
+            <span set:html={post.data.title}></span>
+          </span>
+      ))}
+    </div>
   </div>
 </section>
 
@@ -396,37 +395,34 @@
     </div>
 
     <div class="stories">
-      <a class="story-card feature" href="/post-template">
-        <span class="tag">Olympics</span>
-        <h3>The wait is over: Paris Olympics 2024 to kick off with glamour and glory!</h3>
-        <p style="color:#5b6472; font-size:14.5px;">The Games return to the Seine — here's what to expect as the opening ceremony lights up Paris.</p>
-        <div class="meta">JUL 26, 2024</div>
-        <div class="read"><span>Read the story</span><span>→</span></div>
-      </a>
-
-      <a class="story-card" href="/post-template">
-        <span class="tag">Olympics</span>
-        <h3>Get ready to cheer: India's Olympic schedule for Day 1 (27th July)</h3>
-        <div class="read"><span>JUL 26, 2024</span><span>→</span></div>
-      </a>
-
-      <a class="story-card" href="/post-template">
-        <span class="tag">Cricket</span>
-        <h3>Australian legend Shane Warne dies aged 52</h3>
-        <div class="read"><span>MAR 04, 2022</span><span>→</span></div>
-      </a>
-
-      <a class="story-card" href="/post-template">
-        <span class="tag">Commonwealth Games</span>
-        <h3>Birmingham 2022: India's schedule for 1st August</h3>
-        <div class="read"><span>AUG 01, 2022</span><span>→</span></div>
-      </a>
-
-      <a class="story-card" href="/post-template">
-        <span class="tag">Commonwealth Games</span>
-        <h3>Commonwealth Games 2022 set to begin today!</h3>
-        <div class="read"><span>JUL 28, 2022</span><span>→</span></div>
-      </a>
+      {latestPosts.map((post, index) => (
+        <a class={`story-card ${index === 0 ? 'feature' : ''}`} href={`/posts/${post.id}`}>
+          
+          {/* Automatically removes hyphens and makes the tag uppercase */}
+          <span class="tag">{(post.data.category || 'Sports').replace(/-/g, ' ').toUpperCase()}</span>
+          
+          {/* Automatically strips the ugly quotation marks from the start and end of titles */}
+          {/* Formats the title beautifully */}
+          <h3 set:html={formatTitle(post.data.title)}></h3>
+          
+          {index === 0 && (
+              <p style="color:#5b6472;font-size:14.5px;">
+                {/* Feeds the feature card a 280-character excerpt to fill the void */}
+                {generateCleanExcerpt(post.body, 280)}
+              </p>
+          )}
+          
+          <div class="meta">
+              {/* Forces the date to be uppercase like your original design */}
+              {formatDate(post.data.date).toUpperCase()}
+          </div>
+          
+          <div class="read">
+              <span>Read the story</span>
+              <span>→</span>
+          </div>
+        </a>
+      ))}
     </div>
   </div>
 </section>
@@ -440,7 +436,6 @@
       </div>
       <p>Four beats, one newsroom. Dig into the coverage that matters to you.</p>
     </div>
-
     <div class="cat-grid">
       <div class="cat-tile">
         <span class="num">01 / OLYMPICS</span>
@@ -521,65 +516,4 @@
   </div>
 </section>
 
-<footer id="about">
-  <div class="wrap">
-    <div class="foot-grid">
-      <div>
-        <div class="foot-brand">
-          <svg class="bolt" viewBox="0 0 26 34" width="20" height="26" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M15 0L0 20h9l-3 14 17-21h-10L15 0z"/></svg>
-          <span class="brand-text" style="color:var(--chalk);">LIGHTNING SPORTS</span>
-        </div>
-        <p style="max-width:34ch;">One place for all your sports news. Independent coverage of cricket, football, tennis and the Olympics, written by people who watch every match.</p>
-      </div>
-      <div>
-        <h4>Explore</h4>
-        <ul>
-          <li><a href="#latest">Latest stories</a></li>
-          <li><a href="/category-template">Categories</a></li>
-          <li><a href="/about-us">About us</a></li>
-          <li><a href="/join-us">Join us</a></li>
-        </ul>
-      </div>
-      <div>
-        <h4>Contact</h4>
-        <p>Bahraich, 271801<br>Uttar Pradesh, India</p>
-        <p><a href="mailto:tejaskhanna15@gmail.com">tejaskhanna15@gmail.com</a></p>
-        <p><a href="https://twitter.com/TejasKhanna14" target="_blank" rel="noopener noreferrer">@TejasKhanna14 on X</a></p>
-      </div>
-    </div>
-    <div class="foot-bottom">
-      <span>© 2021–2026 Lightning Sports. All rights reserved.</span>
-      <span>Built independently — no WordPress runtime required.</span>
-    </div>
-  </div>
-</footer>
-
-<script>
-  // Mobile menu toggle
-  const menuToggle = document.getElementById('menuToggle');
-  const mainMenu = document.getElementById('mainMenu');
-  menuToggle.addEventListener('click', () => {
-    const isOpen = mainMenu.classList.toggle('open');
-    menuToggle.setAttribute('aria-expanded', isOpen);
-  });
-
-  // Scoreboard ticker content — duplicated once for a seamless loop
-  const headlines = [
-    "Paris Olympics 2024 kicks off with glamour and glory",
-    "India's Olympic schedule for Day 1 (27th July) confirmed",
-    "Commonwealth Games Birmingham 2022: India's Day 1 schedule",
-    "Commonwealth Games 2022 set to begin today",
-    "Australian legend Shane Warne dies aged 52",
-    "UEFA Champions League 2021/22 full fixtures announced",
-    "ICC T20 World Cup fixtures announced"
-  ];
-  const track = document.getElementById('tickerTrack');
-  function renderTicker(){
-    const html = headlines.map(h => `<span class="item"><b>●</b> ${h}</span>`).join('');
-    track.innerHTML = html + html; // duplicate for seamless scroll
-  }
-  renderTicker();
-</script>
-
-</body>
-</html>
+</BaseLayout>

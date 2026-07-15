@@ -340,10 +340,12 @@
 <script>
   const menuToggle = document.getElementById('menuToggle');
   const mainMenu = document.getElementById('mainMenu');
-  menuToggle.addEventListener('click', () => {
-    const isOpen = mainMenu.classList.toggle('open');
-    menuToggle.setAttribute('aria-expanded', isOpen);
+  if (menuToggle && mainMenu) {
+    menuToggle.addEventListener("click", () => {
+      const isOpen = mainMenu.classList.toggle("open");
+      menuToggle.setAttribute("aria-expanded", isOpen);
   });
+};
 </script>
 </body>
 </html>
