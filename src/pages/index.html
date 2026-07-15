@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lightning Sports — One place for all your sports news</title>
+<meta name="description" content="Lightning Sports: fast, sharp coverage of cricket, football, tennis and the Olympics.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B1220;
+    --ink-2:#111B2C;
+    --inkline:#22314A;
+    --pitch:#0F2E22;
+    --pitch-line:#1E4635;
+    --chalk:#F3F1E7;
+    --chalk-2:#EAE7D8;
+    --volt:#F2A63D;
+    --scarlet:#FF4438;
+    --slate:#8B97A6;
+    --ink-soft:#0d1524;
+    --font-display:'Anton', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:var(--font-body);
+    background:var(--chalk);
+    color:var(--ink);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit; text-decoration:none;}
+  img{max-width:100%; display:block;}
+  ul{list-style:none;}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px;}
+  :focus-visible{outline:3px solid var(--volt); outline-offset:2px;}
+
+  /* ---------- eyebrow / label ---------- */
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+  .eyebrow .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--scarlet);
+    box-shadow:0 0 0 0 rgba(255,68,56,.6);
+    animation:pulse 1.8s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(255,68,56,.55);}
+    70%{box-shadow:0 0 0 8px rgba(255,68,56,0);}
+    100%{box-shadow:0 0 0 0 rgba(255,68,56,0);}
+  }
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky; top:0; z-index:100;
+    background:var(--ink);
+    border-bottom:1px solid var(--inkline);
+  }
+  .nav-row{
+    display:flex; align-items:center; justify-content:space-between;
+    height:76px;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .bolt{
+    width:26px; height:34px; flex:none;
+  }
+  .bolt path{fill:var(--volt);}
+  .brand-text{color:var(--chalk); font-family:var(--font-display); font-size:20px; letter-spacing:.03em; line-height:1;}
+  .brand-text span{display:block; font-family:var(--font-mono); font-size:10px; color:var(--slate); letter-spacing:.16em; text-transform:uppercase; margin-top:4px; font-weight:500;}
+
+  nav.primary{display:flex; align-items:center; gap:2px;}
+  nav.primary > ul{display:flex; align-items:center;}
+  nav.primary a.top-link{
+    color:var(--chalk); font-size:14px; font-weight:600;
+    padding:10px 16px; display:block; border-radius:4px;
+    transition:color .15s ease;
+  }
+  nav.primary li{position:relative;}
+  nav.primary a.top-link:hover{color:var(--volt);}
+  .has-sub:hover .submenu, .has-sub:focus-within .submenu{display:block;}
+  .submenu{
+    display:none; position:absolute; top:100%; left:12px;
+    background:var(--ink-2); border:1px solid var(--inkline);
+    min-width:220px; padding:6px; border-radius:6px;
+  }
+  .submenu a{
+    display:block; padding:9px 12px; font-size:13px; color:var(--slate);
+    font-family:var(--font-mono); border-radius:4px;
+  }
+  .submenu a:hover{background:var(--inkline); color:var(--chalk);}
+  .join-btn{
+    background:var(--volt); color:var(--ink) !important;
+    padding:9px 18px !important; border-radius:3px;
+    font-family:var(--font-mono); text-transform:uppercase; font-size:12px !important;
+    letter-spacing:.08em; font-weight:600 !important;
+  }
+  .menu-toggle{display:none; background:none; border:1px solid var(--inkline); color:var(--chalk); width:40px; height:40px; border-radius:4px; font-size:18px;}
+
+  @media (max-width:920px){
+    nav.primary > ul{
+      display:none;
+      position:absolute; top:76px; left:0; right:0;
+      background:var(--ink); border-bottom:1px solid var(--inkline);
+      flex-direction:column; align-items:stretch; padding:8px 20px 20px;
+    }
+    nav.primary > ul.open{display:flex;}
+    nav.primary a.top-link{padding:12px 4px; border-bottom:1px solid var(--ink-2);}
+    .submenu{position:static; display:block; border:none; background:none; padding:0 0 0 14px;}
+    .has-sub .submenu{display:block;}
+    .menu-toggle{display:block;}
+    .join-btn{margin-top:8px; text-align:center;}
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:
+      radial-gradient(ellipse 700px 420px at 18% -10%, rgba(242,166,61,.14), transparent 60%),
+      radial-gradient(ellipse 600px 500px at 100% 10%, rgba(255,68,56,.12), transparent 60%),
+      var(--ink);
+    color:var(--chalk);
+    padding:76px 0 0;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero .wrap{position:relative; z-index:2;}
+  .hero .eyebrow{color:var(--scarlet);}
+  .hero h1{
+    font-family:var(--font-display);
+    font-weight:400;
+    font-size:clamp(42px, 8vw, 88px);
+    line-height:.98;
+    letter-spacing:.005em;
+    margin:20px 0 22px;
+    max-width:14ch;
+  }
+  .hero h1 .accent{color:var(--volt);}
+  .hero p.lede{
+    font-size:18px; color:var(--slate); max-width:46ch; margin-bottom:34px;
+  }
+  .hero-cta{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:56px;}
+  .btn{
+    font-family:var(--font-mono); font-weight:600; font-size:13px;
+    letter-spacing:.06em; text-transform:uppercase;
+    padding:14px 24px; border-radius:3px; display:inline-block;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .btn-primary{background:var(--volt); color:var(--ink);}
+  .btn-primary:hover{transform:translateY(-2px);}
+  .btn-ghost{border:1px solid var(--inkline); color:var(--chalk);}
+  .btn-ghost:hover{border-color:var(--volt); color:var(--volt);}
+
+  /* ---------- scoreboard ticker ---------- */
+  .ticker{
+    border-top:1px solid var(--inkline);
+    background:var(--ink-2);
+    overflow:hidden;
+    position:relative;
+  }
+  .ticker-label{
+    position:absolute; left:0; top:0; bottom:0; z-index:2;
+    display:flex; align-items:center; gap:8px;
+    background:var(--ink-2);
+    padding:0 18px 0 28px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em;
+    color:var(--scarlet); text-transform:uppercase; font-weight:600;
+    box-shadow:24px 0 24px -8px var(--ink-2);
+  }
+  .ticker-track{
+    display:flex; white-space:nowrap;
+    animation:scroll-left 42s linear infinite;
+    padding-left:150px;
+  }
+  @media (prefers-reduced-motion: reduce){ .ticker-track{animation:none;} }
+  .ticker-track span.item{
+    font-family:var(--font-mono); font-size:13px; color:var(--slate);
+    padding:16px 34px; border-right:1px solid var(--inkline);
+  }
+  .ticker-track span.item b{color:var(--chalk); font-weight:500;}
+  @keyframes scroll-left{
+    from{transform:translateX(0);}
+    to{transform:translateX(-50%);}
+  }
+
+  /* ---------- section shell ---------- */
+  section{padding:88px 0;}
+  .section-head{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    gap:24px; margin-bottom:44px; flex-wrap:wrap;
+  }
+  .section-head .eyebrow{color:var(--scarlet); margin-bottom:14px;}
+  .section-head h2{font-family:var(--font-display); font-weight:400; font-size:clamp(28px,4vw,42px);}
+  .section-head p{color:#5b6472; max-width:40ch; font-size:15px;}
+
+  /* ---------- stories grid ---------- */
+  .stories{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:24px;}
+  @media (max-width:920px){ .stories{grid-template-columns:1fr 1fr;} }
+  @media (max-width:640px){ .stories{grid-template-columns:1fr;} }
+  .story-card{
+    background:#fff;
+    border:1px solid #DEDACB;
+    border-radius:6px;
+    padding:26px 24px 24px;
+    display:flex; flex-direction:column; gap:16px;
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .story-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 16px 34px -18px rgba(11,18,32,.35);
+    border-color:var(--ink);
+  }
+  .story-card.feature{grid-row:span 2; padding:34px 30px;}
+  .tag{
+    align-self:flex-start;
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:.1em;
+    text-transform:uppercase; font-weight:600;
+    padding:5px 10px; border-radius:20px;
+    background:var(--pitch); color:var(--volt);
+  }
+  .story-card h3{
+    font-size:19px; font-weight:800; line-height:1.28;
+  }
+  .story-card.feature h3{font-size:27px; line-height:1.2;}
+  .story-card .meta{
+    font-family:var(--font-mono); font-size:12px; color:var(--slate); color:#8A8570;
+    margin-top:auto; display:flex; align-items:center; gap:8px;
+  }
+  .story-card .read{
+    font-family:var(--font-mono); font-size:12px; font-weight:600;
+    color:var(--ink); border-top:1px dashed #DEDACB; padding-top:14px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .story-card:hover .read{color:var(--scarlet);}
+
+  /* ---------- categories ---------- */
+  .categories{background:var(--pitch); color:var(--chalk);}
+  .categories .section-head .eyebrow{color:var(--volt);}
+  .categories .section-head p{color:#B7CFC2;}
+  .cat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:18px;}
+  @media (max-width:920px){ .cat-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:520px){ .cat-grid{grid-template-columns:1fr;} }
+  .cat-tile{
+    border:1px solid var(--pitch-line);
+    border-radius:6px;
+    padding:26px 20px;
+    background:rgba(255,255,255,.02);
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .cat-tile:hover{border-color:var(--volt); background:rgba(242,166,61,.05);}
+  .cat-tile .num{
+    font-family:var(--font-mono); font-size:12px; color:var(--volt); margin-bottom:18px; display:block;
+  }
+  .cat-tile h3{font-family:var(--font-display); font-weight:400; font-size:22px; margin-bottom:12px;}
+  .cat-tile ul li{font-size:13px; color:#B7CFC2; padding:4px 0;}
+  .cat-tile ul li a:hover{color:var(--volt);}
+
+  /* ---------- newsletter ---------- */
+  .subscribe{background:var(--ink); color:var(--chalk);}
+  .sub-panel{
+    display:grid; grid-template-columns:1.1fr 1fr; gap:50px; align-items:center;
+    border:1px solid var(--inkline); border-radius:10px; padding:52px;
+    background:linear-gradient(135deg, rgba(242,166,61,.05), transparent 60%);
+  }
+  @media (max-width:820px){ .sub-panel{grid-template-columns:1fr; padding:36px 26px;} }
+  .sub-panel h2{font-family:var(--font-display); font-weight:400; font-size:clamp(26px,4vw,38px); margin-bottom:14px;}
+  .sub-panel p{color:var(--slate); max-width:40ch;}
+  form.sub-form{display:flex; gap:0; border:1px solid var(--inkline); border-radius:4px; overflow:hidden;}
+  form.sub-form input{
+    flex:1; background:var(--ink-2); border:none; color:var(--chalk);
+    padding:16px 18px; font-family:var(--font-mono); font-size:13px;
+  }
+  form.sub-form input::placeholder{color:var(--slate);}
+  form.sub-form input:focus{outline:none;}
+  form.sub-form button{
+    background:var(--volt); border:none; padding:0 22px;
+    font-family:var(--font-mono); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:12px;
+    cursor:pointer;
+  }
+  .sub-note{font-family:var(--font-mono); font-size:11px; color:var(--slate); margin-top:12px;}
+  .whatsapp-link{
+    display:inline-flex; align-items:center; gap:8px; margin-top:22px;
+    font-family:var(--font-mono); font-size:12px; color:#3ee08c; font-weight:600;
+  }
+
+  /* ---------- dual-tier subscribe options ---------- */
+  .free-badge{
+    display:inline-block; font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    font-weight:700; color:var(--pitch); background:var(--volt); padding:3px 9px; border-radius:12px; margin-bottom:12px;
+  }
+  .tier-options{display:flex; flex-direction:column; gap:12px; margin-bottom:22px;}
+  .tier-option{
+    display:flex; gap:14px; align-items:flex-start; padding:16px; border:1px solid var(--inkline); border-radius:6px;
+    cursor:pointer; transition:border-color .15s ease, background .15s ease;
+  }
+  .tier-option:hover, .tier-option.checked{border-color:var(--volt); background:rgba(242,166,61,.05);}
+  .tier-option input[type="checkbox"]{
+    appearance:none; width:18px; height:18px; border:1px solid var(--slate); border-radius:4px; flex:none; margin-top:2px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .tier-option input[type="checkbox"]:checked{background:var(--volt); border-color:var(--volt);}
+  .tier-option input[type="checkbox"]:checked::after{content:"✓"; color:var(--ink); font-size:12px; font-weight:700; display:block; text-align:center; line-height:16px;}
+  .tier-option .t-title{font-weight:700; font-size:14.5px; margin-bottom:4px;}
+  .tier-option .t-desc{font-size:13px; color:var(--slate);}
+  .trust-note{
+    display:flex; gap:10px; align-items:flex-start; margin-top:18px; padding-top:18px; border-top:1px dashed var(--inkline);
+    font-size:12.5px; color:var(--slate); line-height:1.6;
+  }
+
+  /* ---------- footer ---------- */
+  footer{background:var(--ink-soft); color:var(--slate); padding:56px 0 28px; border-top:1px solid var(--inkline);}
+  .foot-grid{display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:40px; margin-bottom:44px;}
+  @media (max-width:760px){ .foot-grid{grid-template-columns:1fr; gap:32px;} }
+  .foot-grid h4{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--chalk); margin-bottom:16px;
+  }
+  .foot-grid p, .foot-grid a{font-size:13.5px; line-height:1.9;}
+  .foot-grid ul li a:hover{color:var(--volt);}
+  .foot-brand{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  .foot-brand .brand-text{font-size:17px;}
+  .foot-bottom{
+    border-top:1px solid var(--inkline); padding-top:22px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    font-size:12px; font-family:var(--font-mono);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav-row">
+    <a href="#" class="brand" aria-label="Lightning Sports home">
+      <svg class="bolt" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M15 0L0 20h9l-3 14 17-21h-10L15 0z"/>
+      </svg>
+      <span class="brand-text">LIGHTNING<br>SPORTS<span>Every field. Every score.</span></span>
+    </a>
+
+    <nav class="primary">
+      <button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="mainMenu" aria-label="Toggle menu">☰</button>
+      <ul id="mainMenu">
+        <li><a class="top-link" href="#latest">Home</a></li>
+        <li><a class="top-link" href="/category-template">Olympics</a></li>
+        <li class="has-sub">
+          <a class="top-link" href="/category-template" tabindex="0">Cricket ▾</a>
+          <div class="submenu">
+            <a href="/category-template">T20 World Cup</a>
+            <a href="/category-template">World Test Championship</a>
+          </div>
+        </li>
+        <li><a class="top-link" href="/category-template">Football</a></li>
+        <li><a class="top-link" href="/category-template">Tennis</a></li>
+        <li><a class="top-link" href="/about-us">About Us</a></li>
+        <li><a class="top-link join-btn" href="/join-us">Join Us</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span>Live coverage, every match day</span>
+    <h1>ONE PLACE.<br>EVERY FIELD.<br><span class="accent">EVERY SCORE.</span></h1>
+    <p class="lede">Cricket, football, tennis and the Olympics — reported fast, explained straight, no fluff. Lightning Sports has been calling the plays since 2021.</p>
+    <div class="hero-cta">
+      <a href="#latest" class="btn btn-primary">Read the latest</a>
+      <a href="#subscribe" class="btn btn-ghost">Get the newsletter</a>
+    </div>
+  </div>
+
+  <div class="ticker" role="marquee" aria-label="Latest headlines ticker">
+    <div class="ticker-label"><span class="dot"></span>Headlines</div>
+    <div class="ticker-track" id="tickerTrack"><!-- filled by JS --></div>
+  </div>
+</section>
+
+<section id="latest">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Latest stories</span>
+        <h2>From the desk this week</h2>
+      </div>
+      <p>Straight-talking recaps and schedules, filed the moment the whistle blows.</p>
+    </div>
+
+    <div class="stories">
+      <a class="story-card feature" href="/post-template">
+        <span class="tag">Olympics</span>
+        <h3>The wait is over: Paris Olympics 2024 to kick off with glamour and glory!</h3>
+        <p style="color:#5b6472; font-size:14.5px;">The Games return to the Seine — here's what to expect as the opening ceremony lights up Paris.</p>
+        <div class="meta">JUL 26, 2024</div>
+        <div class="read"><span>Read the story</span><span>→</span></div>
+      </a>
+
+      <a class="story-card" href="/post-template">
+        <span class="tag">Olympics</span>
+        <h3>Get ready to cheer: India's Olympic schedule for Day 1 (27th July)</h3>
+        <div class="read"><span>JUL 26, 2024</span><span>→</span></div>
+      </a>
+
+      <a class="story-card" href="/post-template">
+        <span class="tag">Cricket</span>
+        <h3>Australian legend Shane Warne dies aged 52</h3>
+        <div class="read"><span>MAR 04, 2022</span><span>→</span></div>
+      </a>
+
+      <a class="story-card" href="/post-template">
+        <span class="tag">Commonwealth Games</span>
+        <h3>Birmingham 2022: India's schedule for 1st August</h3>
+        <div class="read"><span>AUG 01, 2022</span><span>→</span></div>
+      </a>
+
+      <a class="story-card" href="/post-template">
+        <span class="tag">Commonwealth Games</span>
+        <h3>Commonwealth Games 2022 set to begin today!</h3>
+        <div class="read"><span>JUL 28, 2022</span><span>→</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="categories" id="categories">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Beats we cover</span>
+        <h2>Pick your sport</h2>
+      </div>
+      <p>Four beats, one newsroom. Dig into the coverage that matters to you.</p>
+    </div>
+
+    <div class="cat-grid">
+      <div class="cat-tile">
+        <span class="num">01 / OLYMPICS</span>
+        <h3>Tokyo &amp; Paris</h3>
+        <ul>
+          <li><a href="/category-template">Tokyo Olympics 2020</a></li>
+          <li><a href="/category-template">Paris Olympics 2024</a></li>
+        </ul>
+      </div>
+      <div class="cat-tile">
+        <span class="num">02 / CRICKET</span>
+        <h3>Cricket</h3>
+        <ul>
+          <li><a href="/category-template">T20 World Cup</a></li>
+          <li><a href="/category-template">World Test Championship</a></li>
+        </ul>
+      </div>
+      <div class="cat-tile">
+        <span class="num">03 / FOOTBALL</span>
+        <h3>Football</h3>
+        <ul>
+          <li><a href="/category-template">Transfers &amp; results</a></li>
+          <li><a href="/category-template">Champions League</a></li>
+        </ul>
+      </div>
+      <div class="cat-tile">
+        <span class="num">04 / TENNIS</span>
+        <h3>Tennis</h3>
+        <ul>
+          <li><a href="/category-template">Grand Slams</a></li>
+          <li><a href="/category-template">Tour results</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="subscribe" id="subscribe">
+  <div class="wrap">
+    <div class="sub-panel">
+      <div>
+        <span class="free-badge">Free — always</span>
+        <span class="eyebrow"><span class="dot"></span>Choose your sports fix</span>
+        <h2 style="margin-top:14px;">No paywall. No catch. Just the news.</h2>
+        <p>We're earning your trust before we ever ask for anything. Pick one option or both — it costs nothing either way.</p>
+        <a class="whatsapp-link" href="https://api.whatsapp.com/send?phone=&text=Hi%2C%20I%20got%20your%20WhatsApp%20information%20from%20your%20website." target="_blank" rel="noopener noreferrer">💬 Chat on WhatsApp</a>
+      </div>
+      <div>
+        <form id="subscribeForm" class="sub-form" style="flex-direction:column; align-items:stretch; border:none;" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed ✓';">
+          <div class="tier-options">
+            <label class="tier-option">
+              <input type="checkbox" name="alerts" checked>
+              <span>
+                <span class="t-title">Story Alerts</span>
+                <span class="t-desc">One email the moment a new story goes live. For readers who want it first.</span>
+              </span>
+            </label>
+            <label class="tier-option">
+              <input type="checkbox" name="wrap" checked>
+              <span>
+                <span class="t-title">The Weekly Wrap</span>
+                <span class="t-desc">Every Sunday: the week's biggest sports stories, in 5 minutes. Free for as long as you're subscribed.</span>
+              </span>
+            </label>
+          </div>
+          <div style="display:flex; border:1px solid var(--inkline); border-radius:4px; overflow:hidden;">
+            <input type="email" placeholder="Email address" aria-label="Email address" required style="flex:1; background:var(--ink-2); border:none; color:var(--chalk); padding:16px 18px; font-family:var(--font-mono); font-size:13px;">
+            <button type="submit" style="background:var(--volt); border:none; padding:0 22px; font-family:var(--font-mono); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Subscribe free</button>
+          </div>
+          <p class="sub-note">Join the readers already getting match-day updates first.</p>
+        </form>
+        <div class="trust-note">
+          <span>🔒</span>
+          <span>Free for as long as you're subscribed. If we ever add a premium tier down the line, early subscribers keep their free access — no bait and switch.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer id="about">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="foot-brand">
+          <svg class="bolt" viewBox="0 0 26 34" width="20" height="26" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M15 0L0 20h9l-3 14 17-21h-10L15 0z"/></svg>
+          <span class="brand-text" style="color:var(--chalk);">LIGHTNING SPORTS</span>
+        </div>
+        <p style="max-width:34ch;">One place for all your sports news. Independent coverage of cricket, football, tennis and the Olympics, written by people who watch every match.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <ul>
+          <li><a href="#latest">Latest stories</a></li>
+          <li><a href="/category-template">Categories</a></li>
+          <li><a href="/about-us">About us</a></li>
+          <li><a href="/join-us">Join us</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p>Bahraich, 271801<br>Uttar Pradesh, India</p>
+        <p><a href="mailto:tejaskhanna15@gmail.com">tejaskhanna15@gmail.com</a></p>
+        <p><a href="https://twitter.com/TejasKhanna14" target="_blank" rel="noopener noreferrer">@TejasKhanna14 on X</a></p>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2021–2026 Lightning Sports. All rights reserved.</span>
+      <span>Built independently — no WordPress runtime required.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Mobile menu toggle
+  const menuToggle = document.getElementById('menuToggle');
+  const mainMenu = document.getElementById('mainMenu');
+  menuToggle.addEventListener('click', () => {
+    const isOpen = mainMenu.classList.toggle('open');
+    menuToggle.setAttribute('aria-expanded', isOpen);
+  });
+
+  // Scoreboard ticker content — duplicated once for a seamless loop
+  const headlines = [
+    "Paris Olympics 2024 kicks off with glamour and glory",
+    "India's Olympic schedule for Day 1 (27th July) confirmed",
+    "Commonwealth Games Birmingham 2022: India's Day 1 schedule",
+    "Commonwealth Games 2022 set to begin today",
+    "Australian legend Shane Warne dies aged 52",
+    "UEFA Champions League 2021/22 full fixtures announced",
+    "ICC T20 World Cup fixtures announced"
+  ];
+  const track = document.getElementById('tickerTrack');
+  function renderTicker(){
+    const html = headlines.map(h => `<span class="item"><b>●</b> ${h}</span>`).join('');
+    track.innerHTML = html + html; // duplicate for seamless scroll
+  }
+  renderTicker();
+</script>
+
+</body>
+</html>

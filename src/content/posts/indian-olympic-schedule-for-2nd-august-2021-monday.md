@@ -1,0 +1,38 @@
+---
+title: "INDIAN OLYMPIC SCHEDULE FOR 2nd AUGUST, 2021, MONDAY"
+date: 2021-08-01
+categories: 
+  - "tokyo-olympics-2020"
+---
+
+![](images/flag-india.jpg)
+
+> **_TEJAS KHANNA, LIGHTNING SPORTS_**
+
+**ATHLETICS:**
+
+_**WOMEN'S DISCUSS THROW, FINALS @ 4:30 PM**_
+
+_KAMALPREET KAUR (representing India)_
+
+**_WOMEN'S 200m, ROUND 1, HEAT 4 @ 7:24 AM_**
+
+_DUTEE CHAND (representing India)_
+
+**EQUESTRIAN:**
+
+**_INDIVIDUAL EVENTING, JUMPING QUALIFIER @ 1:30 PM_**
+
+_FOUAAD MIRZA (representing India)_
+
+**HOCKEY:**
+
+**_WOMEN'S TOURNAMENT, QUARTER-FINALS @ 8:30 PM_**
+
+_INDIA vs AUSTRALIA_
+
+**SHOOTING:**
+
+_**MEN'S 50m RIFLE THREE POSITIONS, QUALIFICATIONS @ 8:00 AM**_
+
+_SANJEEV RAJPUT and AISHWARYA PRATAP SINGH TOMAR (representing India)_

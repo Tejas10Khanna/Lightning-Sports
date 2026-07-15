@@ -1,0 +1,82 @@
+---
+// src/pages/category/[category].astro
+// Generates ONE real page per distinct category value used across your posts
+// Visit e.g. /category/cricket, /category/football, /category/tennis, /category/olympics
+
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts');
+  const categories = [...new Set(posts.map((p) => p.data.category))];
+  return categories.map((category) => ({
+    params: { category },
+    props: {
+      posts: posts
+        .filter((p) => p.data.category === category)
+        .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()),
+    },
+  }));
+}
+
+const { category } = Astro.params;
+const { posts } = Astro.props;
+const label = category[0].toUpperCase() + category.slice(1);
+
+function formatDate(d: Date) {
+  return {
+    day: d.toLocaleDateString('en-US', { day: '2-digit' }),
+    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+  };
+}
+---
+<BaseLayout title={`${label} — Lightning Sports`} description={`Every ${label} story from Lightning Sports.`}>
+<style>
+  .hub-head{background:var(--ink); color:var(--chalk); padding:48px 0 40px;}
+  .hub-head .eyebrow{color:var(--scarlet); margin-bottom:16px;}
+  .hub-head h1{font-family:var(--font-display); font-weight:400; font-size:clamp(38px,6vw,64px); line-height:1;}
+  .hub-head p{color:var(--slate); margin-top:14px; font-size:15px;}
+
+  .hub-body{padding:56px 0 90px;}
+  .story-list{display:flex; flex-direction:column;}
+  .story-row{display:grid; grid-template-columns:90px 1fr; gap:18px; align-items:center; padding:20px 0; border-bottom:1px solid #DEDACB; transition:background .15s ease;}
+  .story-row:hover{background:rgba(15,46,34,.03);}
+  .date-block{font-family:var(--font-mono); text-align:center; background:var(--ink); color:var(--chalk); border-radius:6px; padding:9px 4px;}
+  .date-block .d{font-family:var(--font-display); font-size:18px; color:var(--volt); line-height:1;}
+  .date-block .m{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; margin-top:3px; color:var(--slate);}
+  .story-row h3{font-size:16.5px; font-weight:700; line-height:1.35;}
+  .empty{padding:60px 0; text-align:center; color:#5b6472; font-family:var(--font-mono); font-size:13px;}
+</style>
+
+<div class="breadcrumb">
+  <div class="wrap"><a href="/">Home</a><span class="sep">/</span><span class="current">{label}</span></div>
+</div>
+
+<section class="hub-head">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span>Category</span>
+    <h1>{label}</h1>
+    <p>{posts.length} {posts.length === 1 ? 'story' : 'stories'} and counting.</p>
+  </div>
+</section>
+
+<section class="hub-body">
+  <div class="wrap">
+    {posts.length === 0 ? (
+      <p class="empty">No stories in this category yet — check back soon.</p>
+    ) : (
+      <div class="story-list">
+        {posts.map((post) => {
+          const { day, month } = formatDate(post.data.date);
+          return (
+            <a class="story-row" href={`/posts/${post.slug}`}>
+              <div class="date-block"><div class="d">{day}</div><div class="m">{month}</div></div>
+              <div><h3>{post.data.title}</h3></div>
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</section>
+</BaseLayout>

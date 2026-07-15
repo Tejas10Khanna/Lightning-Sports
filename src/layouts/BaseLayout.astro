@@ -1,0 +1,159 @@
+---
+// src/layouts/BaseLayout.astro
+// Wraps every page in the shared header/footer + design tokens.
+// Usage in any page: <BaseLayout title="..."><...page content...></BaseLayout>
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = "Lightning Sports — One place for all your sports news." } = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title}</title>
+<meta name="description" content={description}>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style is:global>
+  :root{
+    --ink:#0B1220; --ink-2:#111B2C; --inkline:#22314A;
+    --pitch:#0F2E22; --pitch-line:#1E4635;
+    --chalk:#F3F1E7; --chalk-2:#EAE7D8;
+    --volt:#F2A63D; --scarlet:#FF4438; --slate:#8B97A6; --ink-soft:#0d1524;
+    --font-display:'Anton', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:var(--font-body); background:var(--chalk); color:var(--ink); line-height:1.5; -webkit-font-smoothing:antialiased;}
+  a{color:inherit; text-decoration:none;}
+  ul{list-style:none;}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px;}
+  :focus-visible{outline:3px solid var(--volt); outline-offset:2px;}
+
+  .eyebrow{font-family:var(--font-mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; display:inline-flex; align-items:center; gap:8px;}
+  .eyebrow .dot{width:7px; height:7px; border-radius:50%; background:var(--scarlet); animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,68,56,.55);}70%{box-shadow:0 0 0 8px rgba(255,68,56,0);}100%{box-shadow:0 0 0 0 rgba(255,68,56,0);}}
+
+  header{position:sticky; top:0; z-index:100; background:var(--ink); border-bottom:1px solid var(--inkline);}
+  .nav-row{display:flex; align-items:center; justify-content:space-between; height:76px;}
+  .brand{display:flex; align-items:center; gap:12px;}
+  .bolt{width:26px; height:34px; flex:none;}
+  .bolt path{fill:var(--volt);}
+  .brand-text{color:var(--chalk); font-family:var(--font-display); font-size:20px; letter-spacing:.03em; line-height:1;}
+  .brand-text span{display:block; font-family:var(--font-mono); font-size:10px; color:var(--slate); letter-spacing:.16em; text-transform:uppercase; margin-top:4px; font-weight:500;}
+  nav.primary{display:flex; align-items:center; gap:2px;}
+  nav.primary > ul{display:flex; align-items:center;}
+  nav.primary a.top-link{color:var(--chalk); font-size:14px; font-weight:600; padding:10px 16px; display:block; border-radius:4px; transition:color .15s ease;}
+  nav.primary li{position:relative;}
+  nav.primary a.top-link:hover{color:var(--volt);}
+  .has-sub:hover .submenu, .has-sub:focus-within .submenu{display:block;}
+  .submenu{display:none; position:absolute; top:100%; left:12px; background:var(--ink-2); border:1px solid var(--inkline); min-width:220px; padding:6px; border-radius:6px;}
+  .submenu a{display:block; padding:9px 12px; font-size:13px; color:var(--slate); font-family:var(--font-mono); border-radius:4px;}
+  .submenu a:hover{background:var(--inkline); color:var(--chalk);}
+  .join-btn{background:var(--volt); color:var(--ink) !important; padding:9px 18px !important; border-radius:3px; font-family:var(--font-mono); text-transform:uppercase; font-size:12px !important; letter-spacing:.08em; font-weight:600 !important;}
+  .menu-toggle{display:none; background:none; border:1px solid var(--inkline); color:var(--chalk); width:40px; height:40px; border-radius:4px; font-size:18px;}
+  @media (max-width:920px){
+    nav.primary > ul{display:none; position:absolute; top:76px; left:0; right:0; background:var(--ink); border-bottom:1px solid var(--inkline); flex-direction:column; align-items:stretch; padding:8px 20px 20px;}
+    nav.primary > ul.open{display:flex;}
+    nav.primary a.top-link{padding:12px 4px; border-bottom:1px solid var(--ink-2);}
+    .submenu{position:static; display:block; border:none; background:none; padding:0 0 0 14px;}
+    .has-sub .submenu{display:block;}
+    .menu-toggle{display:block;}
+    .join-btn{margin-top:8px; text-align:center;}
+  }
+
+  .breadcrumb{background:var(--ink); padding:16px 0; border-bottom:1px solid var(--inkline);}
+  .breadcrumb .wrap{display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:12px; color:var(--slate); flex-wrap:wrap;}
+  .breadcrumb a:hover{color:var(--volt);}
+  .breadcrumb .sep{color:var(--inkline);}
+  .breadcrumb .current{color:var(--chalk);}
+
+  footer{background:var(--ink-soft); color:var(--slate); padding:56px 0 28px; border-top:1px solid var(--inkline);}
+  .foot-grid{display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:40px; margin-bottom:44px;}
+  @media (max-width:760px){ .foot-grid{grid-template-columns:1fr; gap:32px;} }
+  .foot-grid h4{font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--chalk); margin-bottom:16px;}
+  .foot-grid p, .foot-grid a{font-size:13.5px; line-height:1.9;}
+  .foot-grid ul li a:hover{color:var(--volt);}
+  .foot-brand{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  .foot-brand .brand-text{font-size:17px;}
+  .foot-bottom{border-top:1px solid var(--inkline); padding-top:22px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; font-size:12px; font-family:var(--font-mono);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav-row">
+    <a href="/" class="brand" aria-label="Lightning Sports home">
+      <svg class="bolt" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M15 0L0 20h9l-3 14 17-21h-10L15 0z"/></svg>
+      <span class="brand-text">LIGHTNING<br>SPORTS<span>Every field. Every score.</span></span>
+    </a>
+    <nav class="primary">
+      <button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="mainMenu" aria-label="Toggle menu">☰</button>
+      <ul id="mainMenu">
+        <li><a class="top-link" href="/">Home</a></li>
+        <li><a class="top-link" href="/category/olympics">Olympics</a></li>
+        <li class="has-sub">
+          <a class="top-link" href="/category/cricket" tabindex="0">Cricket ▾</a>
+          <div class="submenu"><a href="/category/cricket">T20 World Cup</a><a href="/category/cricket">World Test Championship</a></div>
+        </li>
+        <li><a class="top-link" href="/category/football">Football</a></li>
+        <li><a class="top-link" href="/category/tennis">Tennis</a></li>
+        <li><a class="top-link" href="/about-us">About Us</a></li>
+        <li><a class="top-link join-btn" href="/join-us">Join Us</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<slot />
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="foot-brand">
+          <svg class="bolt" viewBox="0 0 26 34" width="20" height="26" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M15 0L0 20h9l-3 14 17-21h-10L15 0z"/></svg>
+          <span class="brand-text" style="color:var(--chalk);">LIGHTNING SPORTS</span>
+        </div>
+        <p style="max-width:34ch;">One place for all your sports news. Independent coverage of cricket, football, tennis and the Olympics, written by people who watch every match.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <ul>
+          <li><a href="/#latest">Latest stories</a></li>
+          <li><a href="/category/cricket">Categories</a></li>
+          <li><a href="/about-us">About us</a></li>
+          <li><a href="/join-us">Join us</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p>Bahraich, 271801<br>Uttar Pradesh, India</p>
+        <p><a href="mailto:tejaskhanna15@gmail.com">tejaskhanna15@gmail.com</a></p>
+        <p><a href="https://twitter.com/TejasKhanna14" target="_blank" rel="noopener noreferrer">@TejasKhanna14 on X</a></p>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2021–2026 Lightning Sports. All rights reserved.</span>
+      <span>Built independently — no WordPress runtime required.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const menuToggle = document.getElementById('menuToggle');
+  const mainMenu = document.getElementById('mainMenu');
+  menuToggle?.addEventListener('click', () => {
+    const isOpen = mainMenu.classList.toggle('open');
+    menuToggle.setAttribute('aria-expanded', String(isOpen));
+  });
+</script>
+</body>
+</html>

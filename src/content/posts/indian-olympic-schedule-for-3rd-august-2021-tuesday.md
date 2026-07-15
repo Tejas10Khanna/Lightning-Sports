@@ -1,0 +1,32 @@
+---
+title: "INDIAN OLYMPIC SCHEDULE FOR 3rd AUGUST, 2021, TUESDAY"
+date: 2021-08-02
+categories: 
+  - "tokyo-olympics-2020"
+---
+
+![](images/flag-india.jpg)
+
+> **_TEJAS KHANNA, LIGHTNING SPORTS_**
+
+**ATHLETICS:**
+
+_**WOMEN'S JAVELIN THROW, QUALIFICATIONS, GROUP A @ 5:50 AM**_
+
+_ANNU RANI (representing India)_
+
+**_MEN'S SHOTPUT, QUALIFICATION_**S, _**GROUP A @ 3:45 PM**_
+
+_TAJINDER PAL SINGH TOOR (representing India)_
+
+**HOCKEY:**
+
+_**MEN'S TOURNAMENT, SEMI-FINALS @ 7:00 AM**_
+
+_INDIA vs BELGIUM_
+
+**WRESTLING:**
+
+**_WOMEN'S FREESTYLE 62kg, 1/8 FINAL_**
+
+_SONAM MALIK (INDIA) vs BOLORTUYA KHURELKHUU (MONGOLIA)_
