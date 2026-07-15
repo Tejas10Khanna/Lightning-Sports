@@ -9,7 +9,6 @@ Legend Australian leg-spinner Shane Warne affectionately called "Warnie" has die
 
 <figure>
 
-![](images/wp-1646407569740.gif)
 
 <figcaption>
 
