@@ -1,15 +1,36 @@
 ---
 // src/layouts/BaseLayout.astro
-// Wraps every page in the shared header/footer + design tokens.
-// Usage in any page: <BaseLayout title="..."><...page content...></BaseLayout>
 import Analytics from '@vercel/analytics/astro';
 import SpeedInsights from '@vercel/speed-insights/astro';
+import { getCollection } from 'astro:content';
+
 export interface Props {
   title: string;
   description?: string;
 }
 const { title, description = "Lightning Sports — One place for all your sports news." } = Astro.props;
+
+// Dynamic "Sports" dropdown — built from real post data, not hardcoded.
+const allPosts = await getCollection('posts');
+const lastActive = new Map<string, number>();
+for (const p of allPosts) {
+  const cat = p.data.category;
+  const time = new Date(p.data.date).valueOf();
+  if (!lastActive.has(cat) || time > lastActive.get(cat)!) {
+    lastActive.set(cat, time);
+  }
+}
+const topCategories = [...lastActive.entries()]
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 5)
+  .map(([category]) => category);
+
+function label(cat: string) {
+  return cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 ---
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -53,9 +74,10 @@ const { title, description = "Lightning Sports — One place for all your sports
   nav.primary li{position:relative;}
   nav.primary a.top-link:hover{color:var(--volt);}
   .has-sub:hover .submenu, .has-sub:focus-within .submenu{display:block;}
-  .submenu{display:none; position:absolute; top:100%; left:12px; background:var(--ink-2); border:1px solid var(--inkline); min-width:220px; padding:6px; border-radius:6px;}
+  .submenu{display:none; position:absolute; top:100%; left:12px; background:var(--ink-2); border:1px solid var(--inkline); min-width:240px; padding:6px; border-radius:6px;}
   .submenu a{display:block; padding:9px 12px; font-size:13px; color:var(--slate); font-family:var(--font-mono); border-radius:4px;}
   .submenu a:hover{background:var(--inkline); color:var(--chalk);}
+  .submenu .view-all{border-top:1px solid var(--inkline); margin-top:6px; padding-top:12px; color:var(--volt); font-weight:600;}
   .join-btn{background:var(--volt); color:var(--ink) !important; padding:9px 18px !important; border-radius:3px; font-family:var(--font-mono); text-transform:uppercase; font-size:12px !important; letter-spacing:.08em; font-weight:600 !important;}
   .menu-toggle{display:none; background:none; border:1px solid var(--inkline); color:var(--chalk); width:40px; height:40px; border-radius:4px; font-size:18px;}
   @media (max-width:920px){
@@ -97,13 +119,15 @@ const { title, description = "Lightning Sports — One place for all your sports
       <button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="mainMenu" aria-label="Toggle menu">☰</button>
       <ul id="mainMenu">
         <li><a class="top-link" href="/">Home</a></li>
-        <li><a class="top-link" href="/category/olympics">Olympics</a></li>
         <li class="has-sub">
-          <a class="top-link" href="/category/cricket" tabindex="0">Cricket ▾</a>
-          <div class="submenu"><a href="/category/cricket">T20 World Cup</a><a href="/category/cricket">World Test Championship</a></div>
+          <a class="top-link" href="/sports" tabindex="0">Sports ▾</a>
+          <div class="submenu">
+            {topCategories.map((cat) => (
+              <a href={`/category/${cat}`}>{label(cat)}</a>
+            ))}
+            <a class="view-all" href="/sports">View all sports →</a>
+          </div>
         </li>
-        <li><a class="top-link" href="/category/football">Football</a></li>
-        <li><a class="top-link" href="/category/tennis">Tennis</a></li>
         <li><a class="top-link" href="/about-us">About Us</a></li>
         <li><a class="top-link join-btn" href="/join-us">Join Us</a></li>
       </ul>
@@ -127,7 +151,7 @@ const { title, description = "Lightning Sports — One place for all your sports
         <h4>Explore</h4>
         <ul>
           <li><a href="/#latest">Latest stories</a></li>
-          <li><a href="/category/cricket">Categories</a></li>
+          <li><a href="/sports">All sports</a></li>
           <li><a href="/about-us">About us</a></li>
           <li><a href="/join-us">Join us</a></li>
         </ul>
@@ -150,11 +174,11 @@ const { title, description = "Lightning Sports — One place for all your sports
   const menuToggle = document.getElementById('menuToggle');
   const mainMenu = document.getElementById('mainMenu');
   menuToggle?.addEventListener('click', () => {
-    const isOpen = mainMenu.classList.toggle('open');
+    const isOpen = mainMenu!.classList.toggle('open');
     menuToggle.setAttribute('aria-expanded', String(isOpen));
   });
 </script>
-    <SpeedInsights />
-    <Analytics />
+<SpeedInsights />
+<Analytics />
 </body>
 </html>

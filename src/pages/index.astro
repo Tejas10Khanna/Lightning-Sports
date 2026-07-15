@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { getTopViewedPostIds } from '../lib/views';
 
 // 1. Fetch posts from local markdown collection
 const allPosts = await getCollection('posts');
@@ -10,6 +11,26 @@ allPosts.sort((a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).
 
 // 3. Grab exactly 5 posts to perfectly fill the 1 feature + 4 normal grid
 const latestPosts = allPosts.slice(0, 5);
+
+// 3b. Most Viewed — reads real view counts from Vercel KV (see /api/track-view).
+// Returns an empty array gracefully until KV is set up and has data.
+const topViewedIds = await getTopViewedPostIds(4);
+const topViewedPosts = topViewedIds
+  .map((id) => allPosts.find((p) => p.id === id))
+  .filter((p): p is NonNullable<typeof p> => Boolean(p));
+
+// 3c. Real "Pick your sport" data — built from actual post categories,
+// no hardcoded tournament sub-links.
+const categoryCounts = new Map<string, number>();
+for (const p of allPosts) {
+  categoryCounts.set(p.data.category, (categoryCounts.get(p.data.category) ?? 0) + 1);
+}
+const featuredCategories = [...categoryCounts.entries()]
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 4);
+
+const categoryLabel = (cat: string) =>
+  cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 // 4. Helper to format date cleanly
 const formatDate = (date: Date | string) =>
@@ -427,6 +448,34 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
   </div>
 </section>
 
+<section id="most-viewed">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Reader favorites</span>
+        <h2>Most viewed right now</h2>
+      </div>
+      <p>What everyone else is reading — updated as real traffic comes in.</p>
+    </div>
+
+    {topViewedPosts.length === 0 ? (
+      <p style="font-family:var(--font-mono); font-size:13px; color:#5b6472;">
+        No traffic data yet — this fills in automatically once readers start visiting posts.
+      </p>
+    ) : (
+      <div class="stories">
+        {topViewedPosts.map((post, index) => (
+          <a class={`story-card ${index === 0 ? 'feature' : ''}`} href={`/posts/${post.id}`}>
+            <span class="tag">{categoryLabel(post.data.category).toUpperCase()}</span>
+            <h3 set:html={formatTitle(post.data.title)}></h3>
+            <div class="read"><span>Read the story</span><span>→</span></div>
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+</section>
+
 <section class="categories" id="categories">
   <div class="wrap">
     <div class="section-head">
@@ -437,38 +486,16 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
       <p>Four beats, one newsroom. Dig into the coverage that matters to you.</p>
     </div>
     <div class="cat-grid">
-      <div class="cat-tile">
-        <span class="num">01 / OLYMPICS</span>
-        <h3>Tokyo &amp; Paris</h3>
-        <ul>
-          <li><a href="/category-template">Tokyo Olympics 2020</a></li>
-          <li><a href="/category-template">Paris Olympics 2024</a></li>
-        </ul>
-      </div>
-      <div class="cat-tile">
-        <span class="num">02 / CRICKET</span>
-        <h3>Cricket</h3>
-        <ul>
-          <li><a href="/category-template">T20 World Cup</a></li>
-          <li><a href="/category-template">World Test Championship</a></li>
-        </ul>
-      </div>
-      <div class="cat-tile">
-        <span class="num">03 / FOOTBALL</span>
-        <h3>Football</h3>
-        <ul>
-          <li><a href="/category-template">Transfers &amp; results</a></li>
-          <li><a href="/category-template">Champions League</a></li>
-        </ul>
-      </div>
-      <div class="cat-tile">
-        <span class="num">04 / TENNIS</span>
-        <h3>Tennis</h3>
-        <ul>
-          <li><a href="/category-template">Grand Slams</a></li>
-          <li><a href="/category-template">Tour results</a></li>
-        </ul>
-      </div>
+      {featuredCategories.map(([cat, count], i) => (
+        <a class="cat-tile" href={`/category/${cat}`} style="display:block;">
+          <span class="num">{String(i + 1).padStart(2, '0')} / {categoryLabel(cat).toUpperCase()}</span>
+          <h3>{categoryLabel(cat)}</h3>
+          <p style="font-family:var(--font-mono); font-size:12px; color:#B7CFC2;">{count} {count === 1 ? 'story' : 'stories'}</p>
+        </a>
+      ))}
+    </div>
+    <div style="text-align:center; margin-top:28px;">
+      <a href="/sports" class="btn btn-ghost" style="border-color:var(--pitch-line); color:var(--chalk);">View all sports →</a>
     </div>
   </div>
 </section>
