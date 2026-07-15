@@ -373,8 +373,18 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
   }
   .tier-option input[type="checkbox"]:checked{background:var(--volt); border-color:var(--volt);}
   .tier-option input[type="checkbox"]:checked::after{content:"✓"; color:var(--ink); font-size:12px; font-weight:700; display:block; text-align:center; line-height:16px;}
-  .tier-option .t-title{font-weight:700; font-size:14.5px; margin-bottom:4px;}
-  .tier-option .t-desc{font-size:13px; color:var(--slate);}
+  .tier-option .t-title{
+    display: block; /* Forces the title onto its own line */
+    font-weight: 700; 
+    font-size: 14.5px; 
+    margin-bottom: 6px; /* Adds breathing room below the title */
+  }
+  .tier-option .t-desc{
+    display: block; /* Forces the description onto its own line */
+    font-size: 13px; 
+    color: var(--slate); 
+    line-height: 1.5; /* Gives the text a cleaner reading height */
+  }
   .trust-note{
     display:flex; gap:10px; align-items:flex-start; margin-top:18px; padding-top:18px; border-top:1px dashed var(--inkline);
     font-size:12.5px; color:var(--slate); line-height:1.6;
@@ -508,20 +518,22 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
         <span class="eyebrow"><span class="dot"></span>Choose your sports fix</span>
         <h2 style="margin-top:14px;">No paywall. No catch. Just the news.</h2>
         <p>We're earning your trust before we ever ask for anything. Pick one option or both — it costs nothing either way.</p>
-        <a class="whatsapp-link" href="https://api.whatsapp.com/send?phone=&text=Hi%2C%20I%20got%20your%20WhatsApp%20information%20from%20your%20website." target="_blank" rel="noopener noreferrer">💬 Chat on WhatsApp</a>
+        <a class="whatsapp-link" href="https://api.whatsapp.com/send?phone=919555039015&text=Hi%2C%20I%20want%20to%20subscribe%20to%20Lightning%20Sports!" target="_blank" rel="noopener noreferrer">💬 Chat on WhatsApp</a>
+        <a class="whatsapp-link" href="https://instagram.com/YOUR_INSTA_HANDLE" target="_blank" rel="noopener noreferrer" style="color:#E1306C; margin-left:16px;">📸 Follow on Instagram</a>
       </div>
       <div>
-        <form id="subscribeForm" class="sub-form" style="flex-direction:column; align-items:stretch; border:none;" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed ✓';">
+        <!-- Replace YOUR_FORMSPREE_LINK below with the link they give you -->
+        <form id="subscribeForm" class="sub-form" action="https://formspree.io/f/xzdndvea" method="POST" style="flex-direction:column; align-items:stretch; border:none;">
           <div class="tier-options">
             <label class="tier-option">
-              <input type="checkbox" name="alerts" checked>
+              <input type="checkbox" name="alerts" value="Yes" checked>
               <span>
                 <span class="t-title">Story Alerts</span>
                 <span class="t-desc">One email the moment a new story goes live. For readers who want it first.</span>
               </span>
             </label>
             <label class="tier-option">
-              <input type="checkbox" name="wrap" checked>
+              <input type="checkbox" name="wrap" value="Yes" checked>
               <span>
                 <span class="t-title">The Weekly Wrap</span>
                 <span class="t-desc">Every Sunday: the week's biggest sports stories, in 5 minutes. Free for as long as you're subscribed.</span>
@@ -529,7 +541,8 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
             </label>
           </div>
           <div style="display:flex; border:1px solid var(--inkline); border-radius:4px; overflow:hidden;">
-            <input type="email" placeholder="Email address" aria-label="Email address" required style="flex:1; background:var(--ink-2); border:none; color:var(--chalk); padding:16px 18px; font-family:var(--font-mono); font-size:13px;">
+            <!-- Added name="email" so Formspree captures it properly -->
+            <input type="email" name="email" placeholder="Email address" aria-label="Email address" required style="flex:1; background:var(--ink-2); border:none; color:var(--chalk); padding:16px 18px; font-family:var(--font-mono); font-size:13px;">
             <button type="submit" style="background:var(--volt); border:none; padding:0 22px; font-family:var(--font-mono); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Subscribe free</button>
           </div>
           <p class="sub-note">Join the readers already getting match-day updates first.</p>

@@ -1,8 +1,9 @@
 ---
 title: "Rafael Nadal takes his name back from Wimbledon and Tokyo 2020 Olympics"
 date: 2021-06-18
-categories: 
-  - "tennis"
+categories:
+  - Uncategorized
+mainSport: 'Tennis'
 ---
 
 On June 17th , Spanish Tennis player Rafael Nadal tweeted about his decision of not participating in the Wimbledon and the Olympics.
