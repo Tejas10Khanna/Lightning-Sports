@@ -9,7 +9,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 export async function getStaticPaths() {
   const posts = await getCollection('posts');
   return posts.map((post) => ({
-    params: { slug: post.slug },
+    params: { slug: post.id },
     props: { post },
   }));
 }
@@ -20,7 +20,7 @@ const { Content } = await post.render();
 // Pull 3 related posts from the same category, excluding this one
 const allPosts = await getCollection('posts');
 const related = allPosts
-  .filter((p) => p.data.category === post.data.category && p.slug !== post.slug)
+  .filter((p) => p.data.category === post.data.category && p.id !== post.id)
   .slice(0, 3);
 
 function formatDate(d: Date) {
@@ -98,7 +98,7 @@ function formatDate(d: Date) {
       <h2>More from {post.data.category}</h2>
       <div class="related-grid">
         {related.map((r) => (
-          <a class="related-card" href={`/posts/${r.slug}`}>
+          <a class="related-card" href={`/posts/${r.id}`}>
             <span class="tag">{r.data.category}</span>
             <h4>{r.data.title}</h4>
             <span class="meta">{formatDate(r.data.date)}</span>

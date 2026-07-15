@@ -69,7 +69,7 @@ function formatDate(d: Date) {
         {posts.map((post) => {
           const { day, month } = formatDate(post.data.date);
           return (
-            <a class="story-row" href={`/posts/${post.slug}`}>
+            <a class="story-row" href={`/posts/${post.id}`}>
               <div class="date-block"><div class="d">{day}</div><div class="m">{month}</div></div>
               <div><h3>{post.data.title}</h3></div>
             </a>
