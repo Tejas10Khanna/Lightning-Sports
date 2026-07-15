@@ -5,8 +5,6 @@ categories:
   - "sports"
 ---
 
-![](images/wp-1628387897474.gif)
-
 After a past agreement with Barca, Leo Messi had agreed for another contract with Barcelona with a half salary cut.
 
 Read More about the agreement here : [Messi to remain at Barca !](https://lightningsportsin.wordpress.com/2021/07/15/messi-to-remain-at-barca/)
