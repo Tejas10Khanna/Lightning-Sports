@@ -3,7 +3,7 @@
 // Generates ONE real page per distinct category value used across your posts
 // Visit e.g. /category/cricket, /category/football, /category/tennis, /category/olympics
 
-import { getCollection } from 'astro:content';
+import { getCollection, render} from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 export async function getStaticPaths() {
