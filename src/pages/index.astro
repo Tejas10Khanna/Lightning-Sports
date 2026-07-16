@@ -1,9 +1,10 @@
 ---
 import { categoryType } from '../lib/categoryTypes';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCollection } from 'astro:content';
 import { getTopViewedPostIds } from '../lib/views';
+export const prerender = false; // THIS IS THE MAGIC SWITCH
 
+import { getCollection } from 'astro:content';
 // 1. Fetch posts from local markdown collection
 const allPosts = await getCollection('posts');
 
