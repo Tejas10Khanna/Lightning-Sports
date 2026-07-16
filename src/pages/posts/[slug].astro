@@ -1,11 +1,9 @@
 ---
-// src/pages/posts/[slug].astro
-// Generates ONE real page per markdown file in src/content/posts/
-// Visit e.g. /posts/messi-finally-leaves-barcelona
-
+import { kv } from '@vercel/kv';
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
+// 1. Generate the static paths for all markdown posts
 export async function getStaticPaths() {
   const posts = await getCollection('posts');
   return posts.map((post) => ({
@@ -14,17 +12,33 @@ export async function getStaticPaths() {
   }));
 }
 
+// 2. Extract the current post data from Astro.props
 const { post } = Astro.props;
 const { Content } = await render(post);
 
-// Pull 3 related posts from the same category, excluding this one
+// 3. Track the view count
+if (import.meta.env.PROD && post.id) {
+  try {
+    // Creates a database key like "views:post-slug" and increments it automatically
+    await kv.incr(`views:${post.id}`);
+  } catch (error) {
+    console.error("Failed to update database view count:", error);
+  }
+}
+
+// 4. Pull 3 related posts from the same category, excluding this current one
 const allPosts = await getCollection('posts');
 const related = allPosts
   .filter((p) => p.data.category === post.data.category && p.id !== post.id)
   .slice(0, 3);
 
+// 5. Helper function for your date format
 function formatDate(d: Date) {
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase();
+  return d.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: '2-digit', 
+    year: 'numeric' 
+  }).toUpperCase();
 }
 ---
 <BaseLayout title={`${post.data.title} — Lightning Sports`} description={post.data.dek}>

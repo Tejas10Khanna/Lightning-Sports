@@ -1,25 +1,34 @@
 ---
+export const prerender = false; // Ensures the page is dynamic
+Astro.response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate'); // Busters the CDN cache
+
 import { categoryType } from '../lib/categoryTypes';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getTopViewedPostIds } from '../lib/views';
-export const prerender = false; // THIS IS THE MAGIC SWITCH
-
+import { kv } from '@vercel/kv';
 import { getCollection } from 'astro:content';
+
 // 1. Fetch posts from local markdown collection
 const allPosts = await getCollection('posts');
 
-// 2. Sort posts by date (Newest to Oldest)
+// 2. Sort posts by date (Newest to Oldest) for the latest block
 allPosts.sort((a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf());
 
 // 3. Grab exactly 5 posts to perfectly fill the 1 feature + 4 normal grid
 const latestPosts = allPosts.slice(0, 5);
 
-// 3b. Most Viewed — reads real view counts from Vercel KV (see /api/track-view).
-// Returns an empty array gracefully until KV is set up and has data.
-const topViewedIds = await getTopViewedPostIds(4);
-const topViewedPosts = topViewedIds
-  .map((id) => allPosts.find((p) => p.id === id))
-  .filter((p): p is NonNullable<typeof p> => Boolean(p));
+// 3b. Real-time Trending Posts — reads real view counts from Vercel KV dynamically
+const postsWithViews = await Promise.all(
+  allPosts.map(async (post) => {
+    // Look up the view count from KV using the post ID, default to 0
+    const views = await kv.get<number>(`views:${post.id}`) || 0;
+    return { ...post, views };
+  })
+);
+
+// CHANGED: Named this 'topViewedPosts' so your HTML template below maps it perfectly
+const topViewedPosts = postsWithViews
+  .sort((a, b) => b.views - a.views)
+  .slice(0, 4);
 
 // 3c. Real "Pick your sport" data — separated by type
 const categoryCounts = new Map<string, number>();

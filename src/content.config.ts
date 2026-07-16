@@ -7,12 +7,15 @@ const posts = defineCollection({
     base: "./src/content/posts"
   }),
 
+  // THIS IS THE BLUEPRINT: We added 'dek' and 'tags' here
   schema: z.object({
     title: z.string(),
     date: z.coerce.date(),
     categories: z.array(z.string()).default(['uncategorized']),
     author: z.string().default('Tejas Khanna'),
     mainSport: z.string().optional(), // <-- THE MANUAL OVERRIDE SWITCH
+    dek: z.string().optional(),       // <-- ADDED: Allows subtitles/summaries
+    tags: z.array(z.string()).optional(), // <-- ADDED: Allows specific tags
   }).transform((data) => {
     
     // 1. If you manually set a category in the file, USE IT IMMEDIATELY AND SKIP EVERYTHING ELSE.
