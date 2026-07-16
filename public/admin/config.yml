@@ -5,8 +5,8 @@ backend:
   name: github
   repo: Tejas10Khanna/Lightning-Sports 
   branch: main
-  base_url: https://decap-cms-oauth-provider.vercel.app
-
+  # Add this line, using YOUR new Vercel auth app URL:
+  base_url: https://lightning-sports-auth.vercel.app/
 
 # --- 2. FILE SAVING LOCATIONS ---
 media_folder: "src/content/posts/images"
