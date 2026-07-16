@@ -1,7 +1,10 @@
 ---
+export const prerender = false; // CRITICAL: without this, kv.incr() only ran once at build time, not per visitor
+
 import { kv } from '@vercel/kv';
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { slugify } from '../../lib/categoryTypes';
 
 // 1. Generate the static paths for all markdown posts
 export async function getStaticPaths() {
@@ -16,28 +19,38 @@ export async function getStaticPaths() {
 const { post } = Astro.props;
 const { Content } = await render(post);
 
-// 3. Track the view count
+// category is now always treated as an array (matches the CMS's multi-category
+// list field) — a post can genuinely belong to more than one category
+// (e.g. a cricket story that's also part of Olympics coverage).
+const postCategories: string[] = Array.isArray(post.data.category)
+  ? post.data.category
+  : [post.data.category];
+const primaryCategory = postCategories[0] ?? 'Sports';
+
+// 3. Track the view count — now actually runs per real visitor thanks to prerender:false above
 if (import.meta.env.PROD && post.id) {
   try {
-    // Creates a database key like "views:post-slug" and increments it automatically
     await kv.incr(`views:${post.id}`);
   } catch (error) {
-    console.error("Failed to update database view count:", error);
+    console.error('Failed to update database view count:', error);
   }
 }
 
-// 4. Pull 3 related posts from the same category, excluding this current one
+// 4. Pull related posts sharing ANY category with this post, excluding itself
 const allPosts = await getCollection('posts');
 const related = allPosts
-  .filter((p) => p.data.category === post.data.category && p.id !== post.id)
+  .filter((p) => {
+    if (p.id === post.id) return false;
+    const pCats = Array.isArray(p.data.category) ? p.data.category : [p.data.category];
+    return pCats.some((c) => postCategories.includes(c));
+  })
   .slice(0, 3);
 
-// 5. Helper function for your date format
 function formatDate(d: Date) {
-  return d.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: '2-digit', 
-    year: 'numeric' 
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
   }).toUpperCase();
 }
 ---
@@ -75,12 +88,16 @@ function formatDate(d: Date) {
 </style>
 
 <div class="breadcrumb">
-  <div class="wrap"><a href="/">Home</a><span class="sep">/</span><a href={`/category/${post.data.category}`}>{post.data.category}</a><span class="sep">/</span><span class="current">{post.data.title}</span></div>
+  <div class="wrap">
+    <a href="/">Home</a><span class="sep">/</span>
+    <a href={`/category/${slugify(primaryCategory)}`}>{primaryCategory}</a><span class="sep">/</span>
+    <span class="current">{post.data.title}</span>
+  </div>
 </div>
 
 <section class="article-head">
   <div class="wrap">
-    <span class="tag">{post.data.category}</span>
+    {postCategories.map((c) => <span class="tag" style="margin-right:8px;">{c}</span>)}
     <h1>{post.data.title}</h1>
     {post.data.dek && <p class="dek">{post.data.dek}</p>}
     <div class="byline-row">
@@ -100,7 +117,7 @@ function formatDate(d: Date) {
     </article>
     {post.data.tags && (
       <div class="tags-row">
-        {post.data.tags.map((t: string) => <a href={`/category/${post.data.category}`}>{t}</a>)}
+        {post.data.tags.map((t: string) => <a href={`/category/${slugify(primaryCategory)}`}>{t}</a>)}
       </div>
     )}
   </div>
@@ -109,15 +126,18 @@ function formatDate(d: Date) {
 {related.length > 0 && (
   <section class="related">
     <div class="wrap">
-      <h2>More from {post.data.category}</h2>
+      <h2>More from {primaryCategory}</h2>
       <div class="related-grid">
-        {related.map((r) => (
-          <a class="related-card" href={`/posts/${r.id}`}>
-            <span class="tag">{r.data.category}</span>
-            <h4>{r.data.title}</h4>
-            <span class="meta">{formatDate(r.data.date)}</span>
-          </a>
-        ))}
+        {related.map((r) => {
+          const rCats = Array.isArray(r.data.category) ? r.data.category : [r.data.category];
+          return (
+            <a class="related-card" href={`/posts/${r.id}`}>
+              <span class="tag">{rCats[0]}</span>
+              <h4>{r.data.title}</h4>
+              <span class="meta">{formatDate(r.data.date)}</span>
+            </a>
+          );
+        })}
       </div>
     </div>
   </section>

@@ -544,7 +544,7 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
       <div class="stories">
         {topViewedPosts.map((post, index) => (
           <a class={`story-card ${index === 0 ? 'feature' : ''}`} href={`/posts/${post.id}`}>
-            <span class="tag">{categoryLabel(post.data.category).toUpperCase()}</span>
+            <span class="tag">{categoryLabel(Array.isArray(post.data.category) ? post.data.category[0] : post.data.category).toUpperCase()}</span>
             <h3 set:html={formatTitle(post.data.title)}></h3>
             <div class="read"><span>Read the story</span><span>→</span></div>
           </a>

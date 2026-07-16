@@ -32,7 +32,7 @@ collections:
         widget: "datetime"
         
       - label: "1. Primary Sport(s) or Multi-Sport Event(s)"
-        name: "category"
+        name: "mainSport"
         widget: "list"
         default: ["Cricket"]
         hint: "Type the main category (e.g., 'Cricket', 'Basketball', 'F1') and hit Enter. You can add as many as you want!"
