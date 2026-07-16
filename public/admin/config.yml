@@ -5,6 +5,7 @@ backend:
   name: github
   repo: Tejas10Khanna/Lightning-Sports 
   branch: main
+  base_url: https://decap-cms-oauth-provider.vercel.app
 
 
 # --- 2. FILE SAVING LOCATIONS ---
