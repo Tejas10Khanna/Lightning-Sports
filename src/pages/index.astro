@@ -19,8 +19,12 @@ const latestPosts = allPosts.slice(0, 5);
 // 3b. Real-time Trending Posts — reads real view counts from Vercel KV dynamically
 const postsWithViews = await Promise.all(
   allPosts.map(async (post) => {
-    // Look up the view count from KV using the post ID, default to 0
-    const views = await kv.get<number>(`views:${post.id}`) || 0;
+    let views = 0;
+    try {
+      views = (await kv.get<number>(`views:${post.id}`)) || 0;
+    } catch {
+      // KV unavailable — degrade gracefully, don't take the page down
+    }
     return { ...post, views };
   })
 );
