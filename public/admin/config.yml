@@ -60,6 +60,6 @@ collections:
           - "quote"
           - "bulleted-list"
           - "numbered-list"
-          - "table"
           - "code"
-          - "code-block"
+          # 'table' and 'code-block' are not standard buttons in the base config, 
+          # so we remove them to stop the error.
