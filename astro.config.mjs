@@ -1,8 +1,8 @@
 import { defineConfig } from 'astro/config';
-import vercel from '@astrojs/vercel/serverless';
+// We just removed '/serverless' from this line:
+import vercel from '@astrojs/vercel'; 
 
 export default defineConfig({
-  // 'hybrid' keeps articles static, but allows specific pages to be live!
-  output: 'hybrid', 
+  output: 'hybrid',
   adapter: vercel(),
 });
