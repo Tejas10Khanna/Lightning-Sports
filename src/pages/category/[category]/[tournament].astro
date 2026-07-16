@@ -38,9 +38,9 @@ function getSpecificSport(rawTags: string[] | undefined, category: string, tourn
 
 // 3. Build the deep URL paths
 // 3. Build the deep URL paths
+// 3. Build the deep URL paths
 export async function getStaticPaths() {
   
-  // MOVED HERE: Astro needs this inside the function to see it during the build step
   function getSubLabel(rawTags: string[] | undefined, category: string): string | null {
     if (!rawTags) return null;
     const generic = ['sports', 'update', 'announcement', 'uncategorized', category.toLowerCase()];
@@ -55,24 +55,30 @@ export async function getStaticPaths() {
   const pathMap = new Map();
 
   for (const p of allPosts) {
-    const categoryLabel = p.data.category;
-    const catSlug = slugify(categoryLabel);
-    const tournamentLabel = getSubLabel(p.data.rawTags, categoryLabel);
+    // UPGRADE: Loop through the new category array
+    const categories = Array.isArray(p.data.category) ? p.data.category : [p.data.category];
     
-    if (tournamentLabel) {
-      const tourSlug = slugify(tournamentLabel);
-      const uniqueKey = `${catSlug}/${tourSlug}`;
+    for (const categoryLabel of categories) {
+      if (!categoryLabel) continue;
       
-      if (!pathMap.has(uniqueKey)) {
-        pathMap.set(uniqueKey, { 
-          category: catSlug, 
-          tournament: tourSlug, 
-          categoryLabel, 
-          tournamentLabel, 
-          posts: [] 
-        });
+      const catSlug = slugify(categoryLabel);
+      const tournamentLabel = getSubLabel(p.data.rawTags, categoryLabel);
+      
+      if (tournamentLabel) {
+        const tourSlug = slugify(tournamentLabel);
+        const uniqueKey = `${catSlug}/${tourSlug}`;
+        
+        if (!pathMap.has(uniqueKey)) {
+          pathMap.set(uniqueKey, { 
+            category: catSlug, 
+            tournament: tourSlug, 
+            categoryLabel, 
+            tournamentLabel, 
+            posts: [] 
+          });
+        }
+        pathMap.get(uniqueKey).posts.push(p);
       }
-      pathMap.get(uniqueKey).posts.push(p);
     }
   }
 
@@ -85,6 +91,7 @@ export async function getStaticPaths() {
     },
   }));
 }
+
 
 const { categoryLabel, tournamentLabel, posts } = Astro.props;
 const type = categoryType(categoryLabel);

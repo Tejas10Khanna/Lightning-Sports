@@ -23,9 +23,13 @@ const topViewedPosts = topViewedIds
 // 3c. Real "Pick your sport" data — separated by type
 const categoryCounts = new Map<string, number>();
 for (const p of allPosts) {
-  // Ignore backend announcements from the UI grids
-  if (p.data.category !== 'Announcement') {
-    categoryCounts.set(p.data.category, (categoryCounts.get(p.data.category) ?? 0) + 1);
+  // Safely grab the array of categories
+  const categories = Array.isArray(p.data.category) ? p.data.category : [p.data.category];
+  
+  for (const cat of categories) {
+    if (cat && cat !== 'Announcement') {
+      categoryCounts.set(cat, (categoryCounts.get(cat) ?? 0) + 1);
+    }
   }
 }
 
@@ -51,16 +55,11 @@ const formatDate = (date: Date | string) =>
     day: 'numeric',
     year: 'numeric',
   });
-// Helper to strip raw markdown formatting and images to create a clean text excerpt
-// 1. Helper to fix ALL CAPS titles and strip random quotes
+  
 // Upgraded Helper to strip quotes and force perfect Title Case
 const formatTitle = (title: string) => {
   let clean = title.replace(/^["']|["']$/g, '');
-  
-  // Forces the first letter of every word to be capitalized
   clean = clean.replace(/\b\w/g, (match) => match.toUpperCase());
-  
-  // Fixes a few common small words so it looks like professional journalism (optional but recommended)
   const smallWords = ['A', 'An', 'The', 'And', 'But', 'Or', 'For', 'Nor', 'On', 'At', 'To', 'From', 'By', 'With'];
   clean = clean.split(' ').map((word, index) => {
     if (index !== 0 && smallWords.includes(word)) {
@@ -68,11 +67,10 @@ const formatTitle = (title: string) => {
     }
     return word;
   }).join(' ');
-
   return clean;
 };
 
-// 2. Updated Excerpt Cleaner (now allows custom lengths)
+// Updated Excerpt Cleaner (now allows custom lengths)
 const generateCleanExcerpt = (body?: string, length: number = 150) => {
   if (!body) return '';
   return body
@@ -332,7 +330,7 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
   .categories{background:var(--pitch); color:var(--chalk);}
   .categories .section-head .eyebrow{color:var(--volt);}
   .categories .section-head p{color:#B7CFC2;}
-.cat-grid{
+  .cat-grid{
     display: flex; 
     gap: 18px;
     overflow-x: auto; 
@@ -340,14 +338,12 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
     padding-bottom: 16px;
   }
   
-  /* Hides the ugly default scrollbar but keeps swipe functionality */
   .cat-grid::-webkit-scrollbar { display: none; }
   .cat-grid { -ms-overflow-style: none; scrollbar-width: none; }
 
-  /* --- UPGRADED: Fixed width snap tiles --- */
   .cat-tile{
-    flex: 0 0 280px; /* Forces each card to be exactly 280px wide */
-    scroll-snap-align: start; /* Snaps perfectly into place when swiping */
+    flex: 0 0 280px; 
+    scroll-snap-align: start; 
     border:1px solid var(--pitch-line);
     border-radius:6px;
     padding:26px 20px;
@@ -362,7 +358,7 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
   .cat-tile ul li{font-size:13px; color:#B7CFC2; padding:4px 0;}
   .cat-tile ul li a:hover{color:var(--volt);}
 
-  /* ---------- newsletter ---------- */
+  /* ---------- newsletter / sub form ---------- */
   .subscribe{background:var(--ink); color:var(--chalk);}
   .sub-panel{
     display:grid; grid-template-columns:1.1fr 1fr; gap:50px; align-items:center;
@@ -372,18 +368,48 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
   @media (max-width:820px){ .sub-panel{grid-template-columns:1fr; padding:36px 26px;} }
   .sub-panel h2{font-family:var(--font-display); font-weight:400; font-size:clamp(26px,4vw,38px); margin-bottom:14px;}
   .sub-panel p{color:var(--slate); max-width:40ch;}
-  form.sub-form{display:flex; gap:0; border:1px solid var(--inkline); border-radius:4px; overflow:hidden;}
-  form.sub-form input{
-    flex:1; background:var(--ink-2); border:none; color:var(--chalk);
-    padding:16px 18px; font-family:var(--font-mono); font-size:13px;
+  
+  /* FIXED: Set to block so children stack vertically on desktop instead of crushing side-by-side */
+  form.sub-form{display:block;}
+  
+  .email-input-group {
+    display: flex; 
+    border: 1px solid var(--inkline); 
+    border-radius: 4px; 
+    overflow: hidden;
   }
-  form.sub-form input::placeholder{color:var(--slate);}
-  form.sub-form input:focus{outline:none;}
-  form.sub-form button{
-    background:var(--volt); border:none; padding:0 22px;
-    font-family:var(--font-mono); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:12px;
-    cursor:pointer;
+  .email-input-group input {
+    flex: 1; background: var(--ink-2); border: none; color: var(--chalk);
+    padding: 16px 18px; font-family: var(--font-mono); font-size: 13px;
   }
+  .email-input-group input::placeholder{color:var(--slate);}
+  .email-input-group input:focus{outline:none;}
+  .email-input-group button {
+    background: var(--volt); border: none; padding: 0 22px;
+    font-family: var(--font-mono); font-weight: 700; letter-spacing: .06em; 
+    text-transform: uppercase; font-size: 12px; cursor: pointer;
+  }
+  
+  /* MOBILE FIX: Stack the email input and button on small screens */
+  @media (max-width: 560px) {
+    .email-input-group {
+      flex-direction: column;
+      border: none;
+      overflow: visible;
+      gap: 12px;
+    }
+    .email-input-group input {
+      border: 1px solid var(--inkline);
+      border-radius: 4px;
+      width: 100%;
+    }
+    .email-input-group button {
+      padding: 16px 22px;
+      border-radius: 4px;
+      width: 100%;
+    }
+  }
+
   .sub-note{font-family:var(--font-mono); font-size:11px; color:var(--slate); margin-top:12px;}
   .whatsapp-link{
     display:inline-flex; align-items:center; gap:8px; margin-top:22px;
@@ -396,9 +422,12 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
     font-weight:700; color:var(--pitch); background:var(--volt); padding:3px 9px; border-radius:12px; margin-bottom:12px;
   }
   .tier-options{display:flex; flex-direction:column; gap:12px; margin-bottom:22px;}
+  
   .tier-option{
     display:flex; gap:14px; align-items:flex-start; padding:16px; border:1px solid var(--inkline); border-radius:6px;
     cursor:pointer; transition:border-color .15s ease, background .15s ease;
+    min-height: 80px; 
+    height: auto; 
   }
   .tier-option:hover, .tier-option.checked{border-color:var(--volt); background:rgba(242,166,61,.05);}
   .tier-option input[type="checkbox"]{
@@ -408,16 +437,16 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
   .tier-option input[type="checkbox"]:checked{background:var(--volt); border-color:var(--volt);}
   .tier-option input[type="checkbox"]:checked::after{content:"✓"; color:var(--ink); font-size:12px; font-weight:700; display:block; text-align:center; line-height:16px;}
   .tier-option .t-title{
-    display: block; /* Forces the title onto its own line */
+    display: block; 
     font-weight: 700; 
     font-size: 14.5px; 
-    margin-bottom: 6px; /* Adds breathing room below the title */
+    margin-bottom: 6px; 
   }
   .tier-option .t-desc{
-    display: block; /* Forces the description onto its own line */
+    display: block; 
     font-size: 13px; 
     color: var(--slate); 
-    line-height: 1.5; /* Gives the text a cleaner reading height */
+    line-height: 1.5; 
   }
   .trust-note{
     display:flex; gap:10px; align-items:flex-start; margin-top:18px; padding-top:18px; border-top:1px dashed var(--inkline);
@@ -463,22 +492,17 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
       {latestPosts.map((post, index) => (
         <a class={`story-card ${index === 0 ? 'feature' : ''}`} href={`/posts/${post.id}`}>
           
-          {/* Automatically removes hyphens and makes the tag uppercase */}
-          <span class="tag">{(post.data.category || 'Sports').replace(/-/g, ' ').toUpperCase()}</span>
+          <span class="tag">{(Array.isArray(post.data.category) ? post.data.category[0] : post.data.category || 'Sports').replace(/-/g, ' ').toUpperCase()}</span>
           
-          {/* Automatically strips the ugly quotation marks from the start and end of titles */}
-          {/* Formats the title beautifully */}
           <h3 set:html={formatTitle(post.data.title)}></h3>
           
           {index === 0 && (
               <p style="color:#5b6472;font-size:14.5px;">
-                {/* Feeds the feature card a 280-character excerpt to fill the void */}
                 {generateCleanExcerpt(post.body, 280)}
               </p>
           )}
           
           <div class="meta">
-              {/* Forces the date to be uppercase like your original design */}
               {formatDate(post.data.date).toUpperCase()}
           </div>
           
@@ -530,7 +554,6 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
       <p>Continuous coverage of the sports that matter, and the global events where they collide.</p>
     </div>
     
-    <!-- Top Sports Grid -->
     <div class="cat-grid" style="margin-bottom: 32px;">
       {topSports.map(([cat, count], i) => (
         <a class="cat-tile" href={`/category/${cat.toLowerCase().replace(/\s+/g, '-')}`} style="display:block;">
@@ -541,7 +564,6 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
       ))}
     </div>
 
-    <!-- Top Events Grid -->
     {topEvents.length > 0 && (
       <>
         <h3 style="font-family:var(--font-mono); font-size:12px; color:#8B97A6; text-transform:uppercase; letter-spacing:0.1em; margin-bottom: 16px; border-top: 1px solid var(--pitch-line); padding-top: 24px;">Major Events</h3>
@@ -575,8 +597,7 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
         <a class="whatsapp-link" href="https://instagram.com/YOUR_INSTA_HANDLE" target="_blank" rel="noopener noreferrer" style="color:#E1306C; margin-left:16px;">📸 Follow on Instagram</a>
       </div>
       <div>
-        <!-- Replace YOUR_FORMSPREE_LINK below with the link they give you -->
-        <form id="subscribeForm" class="sub-form" action="https://formspree.io/f/xzdndvea" method="POST" style="flex-direction:column; align-items:stretch; border:none;">
+        <form id="subscribeForm" class="sub-form" action="https://formspree.io/f/xzdndvea" method="POST">
           <div class="tier-options">
             <label class="tier-option">
               <input type="checkbox" name="alerts" value="Yes" checked>
@@ -593,11 +614,12 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
               </span>
             </label>
           </div>
-          <div style="display:flex; border:1px solid var(--inkline); border-radius:4px; overflow:hidden;">
-            <!-- Added name="email" so Formspree captures it properly -->
-            <input type="email" name="email" placeholder="Email address" aria-label="Email address" required style="flex:1; background:var(--ink-2); border:none; color:var(--chalk); padding:16px 18px; font-family:var(--font-mono); font-size:13px;">
-            <button type="submit" style="background:var(--volt); border:none; padding:0 22px; font-family:var(--font-mono); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Subscribe free</button>
+          
+          <div class="email-input-group">
+            <input type="email" name="email" placeholder="Email address" aria-label="Email address" required>
+            <button type="submit">Subscribe free</button>
           </div>
+          
           <p class="sub-note">Join the readers already getting match-day updates first.</p>
         </form>
         <div class="trust-note">

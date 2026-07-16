@@ -36,16 +36,23 @@ export async function getStaticPaths() {
   const bySlug = new Map<string, { label: string; posts: typeof allPosts }>();
 
   for (const p of allPosts) {
-    const slug = slugify(p.data.category);
-    if (!bySlug.has(slug)) bySlug.set(slug, { label: p.data.category, posts: [] });
-    bySlug.get(slug)!.posts.push(p);
+    // UPGRADE: This safely handles both single strings AND arrays so older posts don't break
+    const categories = Array.isArray(p.data.category) ? p.data.category : [p.data.category];
+    
+    // Loops through every category the author typed and adds the post to ALL of them!
+    for (const catLabel of categories) {
+      if (!catLabel) continue;
+      const slug = slugify(catLabel);
+      if (!bySlug.has(slug)) bySlug.set(slug, { label: catLabel, posts: [] });
+      bySlug.get(slug)!.posts.push(p);
+    }
   }
 
   return [...bySlug.entries()].map(([slug, { label, posts }]) => ({
     params: { category: slug },
     props: {
       label,
-      posts: posts.sort((a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf()),
+      posts: posts.sort((a: any, b: any) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf()),
     },
   }));
 }

@@ -1,0 +1,65 @@
+# public/admin/config.yml
+
+# --- 1. AUTHORIZATION & BACKEND ---
+backend:
+  name: github
+  repo: Tejas10Khanna/Lightning-Sports 
+  branch: main
+
+
+# --- 2. FILE SAVING LOCATIONS ---
+media_folder: "src/content/posts/images"
+public_folder: "./images"
+
+# --- 3. THE CONTENT SCHEMA ---
+collections:
+  - name: "posts"
+    label: "Story"
+    label_singular: "Story"
+    
+    folder: "src/content/posts"
+    create: true
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    
+    fields:
+      - label: "Title"
+        name: "title"
+        widget: "string"
+        
+      - label: "Publish Date"
+        name: "date"
+        widget: "datetime"
+        
+      - label: "1. Primary Sport(s) or Multi-Sport Event(s)"
+        name: "category"
+        widget: "list"
+        default: ["Cricket"]
+        hint: "Type the main category (e.g., 'Cricket', 'Basketball', 'F1') and hit Enter. You can add as many as you want!"
+        
+      - label: "2. Tournament or Edition (Deep Route)"
+        name: "rawTags"
+        widget: "list"
+        default: ["General Updates"]
+        hint: "Type the specific tournaments (e.g., 'T20 World Cup' and 'Paris 2024'). Hit Enter after each one."
+        
+      - label: "Featured Pull-Quote"
+        name: "featuredQuote"
+        widget: "string"
+        required: false
+        hint: "A short, punchy quote that will be visually highlighted in the middle of the story."
+        
+      - label: "Story Content"
+        name: "body"
+        widget: "markdown"
+        buttons: 
+          - "bold"
+          - "italic"
+          - "link"
+          - "heading-two"
+          - "heading-three"
+          - "quote"
+          - "bulleted-list"
+          - "numbered-list"
+          - "table"
+          - "code"
+          - "code-block"
