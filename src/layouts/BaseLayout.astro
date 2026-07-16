@@ -3,6 +3,8 @@
 import Analytics from '@vercel/analytics/astro';
 import SpeedInsights from '@vercel/speed-insights/astro';
 import { getCollection } from 'astro:content';
+// 1. Import our dynamic brain!
+import { categoryType, slugify } from '../lib/categoryTypes';
 
 export interface Props {
   title: string;
@@ -10,24 +12,33 @@ export interface Props {
 }
 const { title, description = "Lightning Sports — One place for all your sports news." } = Astro.props;
 
-// Dynamic "Sports" dropdown — built from real post data, not hardcoded.
+// 2. Dynamic Dropdown — Built from real post data, entirely automated.
 const allPosts = await getCollection('posts');
 const lastActive = new Map<string, number>();
+
 for (const p of allPosts) {
+  if (p.data.category === 'Announcement') continue; // Keep announcements out of the sports nav
   const cat = p.data.category;
   const time = new Date(p.data.date).valueOf();
   if (!lastActive.has(cat) || time > lastActive.get(cat)!) {
     lastActive.set(cat, time);
   }
 }
-const topCategories = [...lastActive.entries()]
-  .sort((a, b) => b[1] - a[1])
-  .slice(0, 5)
-  .map(([category]) => category);
 
-function label(cat: string) {
-  return cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
+// Sort everything by most recently updated
+const sortedCategories = [...lastActive.entries()].sort((a, b) => b[1] - a[1]);
+
+// Dynamically grab the top 3 continuous sports
+const navSports = sortedCategories
+  .filter(([cat]) => categoryType(cat) === 'sport')
+  .slice(0, 3)
+  .map(([cat]) => cat);
+
+// Dynamically grab the top 2 events
+const navEvents = sortedCategories
+  .filter(([cat]) => categoryType(cat) === 'event')
+  .slice(0, 2)
+  .map(([cat]) => cat);
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -77,6 +88,22 @@ function label(cat: string) {
   .submenu{display:none; position:absolute; top:100%; left:12px; background:var(--ink-2); border:1px solid var(--inkline); min-width:240px; padding:6px; border-radius:6px;}
   .submenu a{display:block; padding:9px 12px; font-size:13px; color:var(--slate); font-family:var(--font-mono); border-radius:4px;}
   .submenu a:hover{background:var(--inkline); color:var(--chalk);}
+  .sub-head {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--slate);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 8px 12px 4px;
+    margin-top: 4px;
+  }
+  .submenu .view-all {
+    margin-top: 6px;
+    border-top: 1px solid var(--inkline);
+    color: var(--volt);
+    border-radius: 0 0 4px 4px;
+  }
   .submenu .view-all{border-top:1px solid var(--inkline); margin-top:6px; padding-top:12px; color:var(--volt); font-weight:600;}
   .join-btn{background:var(--volt); color:var(--ink) !important; padding:9px 18px !important; border-radius:3px; font-family:var(--font-mono); text-transform:uppercase; font-size:12px !important; letter-spacing:.08em; font-weight:600 !important;}
   .menu-toggle{display:none; background:none; border:1px solid var(--inkline); color:var(--chalk); width:40px; height:40px; border-radius:4px; font-size:18px;}
@@ -122,9 +149,19 @@ function label(cat: string) {
         <li class="has-sub">
           <a class="top-link" href="/sports" tabindex="0">Sports ▾</a>
           <div class="submenu">
-            {topCategories.map((cat) => (
-              <a href={`/category/${cat}`}>{label(cat)}</a>
+            
+            {/* Dynamically renders Sports if they exist */}
+            {navSports.length > 0 && <span class="sub-head">Sports</span>}
+            {navSports.map((cat) => (
+              <a href={`/category/${slugify(cat)}`}>{cat}</a>
             ))}
+            
+            {/* Dynamically renders Events if they exist */}
+            {navEvents.length > 0 && <span class="sub-head">Events</span>}
+            {navEvents.map((cat) => (
+              <a href={`/category/${slugify(cat)}`}>{cat}</a>
+            ))}
+            
             <a class="view-all" href="/sports">View all sports →</a>
           </div>
         </li>

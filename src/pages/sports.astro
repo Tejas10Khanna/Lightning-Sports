@@ -2,6 +2,7 @@
 // src/pages/sports.astro
 import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { categoryType, slugify } from '../lib/categoryTypes';
 
 const allPosts = await getCollection('posts');
 
@@ -9,18 +10,16 @@ const counts = new Map<string, number>();
 for (const p of allPosts) {
   counts.set(p.data.category, (counts.get(p.data.category) ?? 0) + 1);
 }
-const liveCategories = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+const all = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+
+const sportsList = all.filter(([cat]) => categoryType(cat) === 'sport');
+const eventsList = all.filter(([cat]) => categoryType(cat) === 'event');
 
 // Sports you plan to cover but haven't published in yet.
-// Edit this list any time — no code changes needed elsewhere.
-const comingSoon = ['kabaddi', 'badminton', 'athletics', 'esports', 'formula-1'];
+const comingSoon = ['Kabaddi', 'Badminton', 'Athletics', 'Esports', 'Formula 1'];
 const notYetLive = comingSoon.filter((c) => !counts.has(c));
-
-function label(cat: string) {
-  return cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 ---
-<BaseLayout title="All Sports — Lightning Sports" description="Every sport Lightning Sports covers, and what's coming next.">
+<BaseLayout title="All Sports — Lightning Sports" description="Every sport and tournament Lightning Sports covers.">
 <style>
   .sports-hero{
     background:
@@ -33,34 +32,44 @@ function label(cat: string) {
   .sports-hero p{color:var(--slate); margin-top:14px; max-width:56ch; font-size:16px;}
 
   section.grid-wrap{padding:70px 0;}
-  .section-label{font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:26px; display:flex; align-items:center; gap:8px;}
+  .section-label{font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:10px; display:flex; align-items:center; gap:8px;}
   .section-label::before{content:""; width:16px; height:2px; background:var(--scarlet);}
+  .section-sub{color:#8A8570; font-size:14px; margin-bottom:32px; max-width:56ch;}
 
-  .sport-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px;}
-  @media (max-width:820px){ .sport-grid{grid-template-columns:1fr 1fr;} }
+  /* Sports — compact, dense grid. Many of these accumulate continuously. */
+  .sport-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
+  @media (max-width:920px){ .sport-grid{grid-template-columns:1fr 1fr;} }
   @media (max-width:560px){ .sport-grid{grid-template-columns:1fr;} }
-
   .sport-card{
-    background:var(--ink); color:var(--chalk); border-radius:10px; padding:30px;
-    position:relative; overflow:hidden; min-height:160px;
+    background:var(--ink); color:var(--chalk); border-radius:8px; padding:22px;
+    position:relative; overflow:hidden; min-height:110px;
     display:flex; flex-direction:column; justify-content:flex-end;
     transition:transform .18s ease;
   }
-  .sport-card:hover{transform:translateY(-4px);}
-  .sport-card::before{
-    content:""; position:absolute; inset:0;
-    background:radial-gradient(ellipse 300px 200px at 90% 0%, rgba(242,166,61,.16), transparent 60%);
+  .sport-card:hover{transform:translateY(-3px);}
+  .sport-card::before{content:""; position:absolute; inset:0; background:radial-gradient(ellipse 220px 150px at 90% 0%, rgba(242,166,61,.14), transparent 60%);}
+  .sport-card .count{position:relative; font-family:var(--font-mono); font-size:10px; color:var(--volt); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;}
+  .sport-card h3{position:relative; font-family:var(--font-display); font-weight:400; font-size:21px;}
+
+  /* Events — fewer, bigger, more feature-like. Each is a much bigger occasion. */
+  .events-band{background:var(--pitch); color:var(--chalk); border-radius:14px; padding:44px;}
+  .event-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:22px;}
+  @media (max-width:760px){ .event-grid{grid-template-columns:1fr;} }
+  .event-card{
+    background:var(--ink); border-radius:10px; padding:32px; min-height:180px;
+    display:flex; flex-direction:column; justify-content:flex-end; position:relative; overflow:hidden;
+    transition:transform .18s ease;
   }
-  .sport-card .count{position:relative; font-family:var(--font-mono); font-size:11px; color:var(--volt); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;}
-  .sport-card h3{position:relative; font-family:var(--font-display); font-weight:400; font-size:26px;}
+  .event-card:hover{transform:translateY(-4px);}
+  .event-card::before{content:""; position:absolute; inset:0; background:radial-gradient(ellipse 320px 220px at 15% 0%, rgba(255,68,56,.14), transparent 60%);}
+  .event-card .count{position:relative; font-family:var(--font-mono); font-size:11px; color:var(--volt); text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px;}
+  .event-card h3{position:relative; font-family:var(--font-display); font-weight:400; font-size:30px;}
+  .event-card .desc{position:relative; font-size:13px; color:var(--slate); margin-top:10px; max-width:36ch;}
 
   .coming-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:16px;}
   @media (max-width:820px){ .coming-grid{grid-template-columns:1fr 1fr 1fr;} }
   @media (max-width:560px){ .coming-grid{grid-template-columns:1fr 1fr;} }
-  .coming-card{
-    border:1px dashed #DEDACB; border-radius:8px; padding:22px 16px; text-align:center;
-    color:#5b6472; font-family:var(--font-mono); font-size:12px; text-transform:uppercase; letter-spacing:.05em;
-  }
+  .coming-card{border:1px dashed #DEDACB; border-radius:8px; padding:22px 16px; text-align:center; color:#5b6472; font-family:var(--font-mono); font-size:12px; text-transform:uppercase; letter-spacing:.05em;}
   .coming-card span{display:block; font-family:var(--font-display); font-size:15px; text-transform:none; color:var(--ink); margin-bottom:8px; letter-spacing:0;}
 </style>
 
@@ -70,32 +79,50 @@ function label(cat: string) {
   <div class="wrap">
     <span class="eyebrow"><span class="dot"></span>Every beat, one roster</span>
     <h1>All the sports we cover</h1>
-    <p>From tournaments we're covering right now to the ones we're gearing up to add — this is the full lineup.</p>
+    <p>Individual sports we follow continuously, and the major multi-sport events where several of them collide.</p>
   </div>
 </section>
 
 <section class="grid-wrap">
   <div class="wrap">
-    <div class="section-label">Currently covering</div>
+    <div class="section-label">Sports</div>
+    <p class="section-sub">Ongoing coverage — cricket, football, tennis, and more, tracked year-round.</p>
     <div class="sport-grid">
-      {liveCategories.map(([cat, count]) => (
-        <a class="sport-card" href={`/category/${cat}`}>
+      {sportsList.map(([cat, count]) => (
+        <a class="sport-card" href={`/category/${slugify(cat)}`}>
           <span class="count">{count} {count === 1 ? 'story' : 'stories'}</span>
-          <h3>{label(cat)}</h3>
+          <h3>{cat}</h3>
         </a>
       ))}
     </div>
+
+    {notYetLive.length > 0 && (
+      <div style="margin-top:40px;">
+        <div class="coming-grid">
+          {notYetLive.map((cat) => (
+            <div class="coming-card"><span>{cat}</span>In the works</div>
+          ))}
+        </div>
+      </div>
+    )}
   </div>
 </section>
 
-{notYetLive.length > 0 && (
+{eventsList.length > 0 && (
   <section class="grid-wrap" style="padding-top:0;">
     <div class="wrap">
-      <div class="section-label">Coming soon</div>
-      <div class="coming-grid">
-        {notYetLive.map((cat) => (
-          <div class="coming-card"><span>{label(cat)}</span>In the works</div>
-        ))}
+      <div class="section-label">Multi-sport events</div>
+      <p class="section-sub">The Olympics, Commonwealth Games, and other events spanning many sports at once — each one its own quadrennial occasion.</p>
+      <div class="events-band">
+        <div class="event-grid">
+          {eventsList.map(([cat, count]) => (
+            <a class="event-card" href={`/category/${slugify(cat)}`}>
+              <span class="count">{count} {count === 1 ? 'story' : 'stories'}</span>
+              <h3>{cat}</h3>
+              <p class="desc">Schedules, ceremonies, and India's campaign — edition by edition.</p>
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   </section>

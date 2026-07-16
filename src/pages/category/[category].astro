@@ -1,32 +1,86 @@
 ---
 // src/pages/category/[category].astro
-// Generates ONE real page per distinct category value used across your posts
-// Visit e.g. /category/cricket, /category/football, /category/tennis, /category/olympics
-
-import { getCollection, render} from 'astro:content';
+import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { categoryType, slugify } from '../../lib/categoryTypes';
+
+const formatTitle = (title: string) => {
+  let clean = title.replace(/^["']|["']$/g, '');
+  clean = clean.replace(/\b\w/g, (match) => match.toUpperCase());
+  const smallWords = ['A', 'An', 'The', 'And', 'But', 'Or', 'For', 'Nor', 'On', 'At', 'To', 'From', 'By', 'With'];
+  clean = clean.split(' ').map((word, index) => {
+    if (index !== 0 && smallWords.includes(word)) {
+      return word.toLowerCase();
+    }
+    return word;
+  }).join(' ');
+  return clean;
+};
+
+const formatGroupName = (name: string) => {
+  return name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+function getSubLabel(rawTags: string[] | undefined, category: string): string | null {
+  if (!rawTags) return null;
+  const generic = ['sports', 'update', 'announcement', 'uncategorized', category.toLowerCase()];
+  const specific = rawTags.find((t) => {
+    const lower = t.toLowerCase().trim();
+    return lower.length > 0 && !generic.some((g) => lower === g || lower.includes(g));
+  });
+  return specific ?? null;
+}
 
 export async function getStaticPaths() {
-  const posts = await getCollection('posts');
-  const categories = [...new Set(posts.map((p) => p.data.category))];
-  return categories.map((category) => ({
-    params: { category },
+  const allPosts = await getCollection('posts');
+  const bySlug = new Map<string, { label: string; posts: typeof allPosts }>();
+
+  for (const p of allPosts) {
+    const slug = slugify(p.data.category);
+    if (!bySlug.has(slug)) bySlug.set(slug, { label: p.data.category, posts: [] });
+    bySlug.get(slug)!.posts.push(p);
+  }
+
+  return [...bySlug.entries()].map(([slug, { label, posts }]) => ({
+    params: { category: slug },
     props: {
-      posts: posts
-        .filter((p) => p.data.category === category)
-        .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()),
+      label,
+      posts: posts.sort((a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf()),
     },
   }));
 }
 
-const { category } = Astro.params;
-const { posts } = Astro.props;
-const label = category[0].toUpperCase() + category.slice(1);
+const { label, posts } = Astro.props;
+const type = categoryType(label);
 
-function formatDate(d: Date) {
+const groups = new Map<string, typeof posts>();
+for (const post of posts) {
+  const sub = getSubLabel(post.data.rawTags, label);
+  if (!sub) continue;
+  if (!groups.has(sub)) groups.set(sub, []);
+  groups.get(sub)!.push(post);
+}
+
+const sortedGroups =
+  type === 'event'
+    ? [...groups.entries()].sort((a, b) => {
+        const aLatest = Math.max(...a[1].map((p) => new Date(p.data.date).valueOf()));
+        const bLatest = Math.max(...b[1].map((p) => new Date(p.data.date).valueOf()));
+        return bLatest - aLatest;
+      })
+    : [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+
+const subSectionLabel = type === 'event' ? 'Past & upcoming editions' : 'Major tournaments';
+const subSectionIntro =
+  type === 'event'
+    ? `Every edition of ${label} we've covered, most recent first.`
+    : `The tournaments driving ${label} coverage, most covered first.`;
+
+function formatDate(d: Date | string) {
+  const date = new Date(d);
   return {
-    day: d.toLocaleDateString('en-US', { day: '2-digit' }),
-    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+    day: date.toLocaleDateString('en-US', { day: '2-digit' }),
+    month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
   };
 }
 ---
@@ -37,46 +91,185 @@ function formatDate(d: Date) {
   .hub-head h1{font-family:var(--font-display); font-weight:400; font-size:clamp(38px,6vw,64px); line-height:1;}
   .hub-head p{color:var(--slate); margin-top:14px; font-size:15px;}
 
-  .hub-body{padding:56px 0 90px;}
+  section{padding:64px 0;}
+  .section-label{font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+  .section-label::before{content:""; width:16px; height:2px; background:var(--scarlet);}
+  .section-intro{color:#8A8570; font-size:14px; margin-bottom:28px; max-width:56ch;}
+
   .story-list{display:flex; flex-direction:column;}
-  .story-row{display:grid; grid-template-columns:90px 1fr; gap:18px; align-items:center; padding:20px 0; border-bottom:1px solid #DEDACB; transition:background .15s ease;}
+  .story-row{display:grid; grid-template-columns:90px 1fr; gap:18px; align-items:center; padding:18px 0; border-bottom:1px solid #DEDACB; transition:background .15s ease;}
   .story-row:hover{background:rgba(15,46,34,.03);}
   .date-block{font-family:var(--font-mono); text-align:center; background:var(--ink); color:var(--chalk); border-radius:6px; padding:9px 4px;}
   .date-block .d{font-family:var(--font-display); font-size:18px; color:var(--volt); line-height:1;}
   .date-block .m{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; margin-top:3px; color:var(--slate);}
-  .story-row h3{font-size:16.5px; font-weight:700; line-height:1.35;}
-  .empty{padding:60px 0; text-align:center; color:#5b6472; font-family:var(--font-mono); font-size:13px;}
+  .story-row h3{font-size:16.5px; font-weight:700; line-height:1.35; color: var(--ink);}
+  .empty{padding:40px 0; text-align:center; color:#5b6472; font-family:var(--font-mono); font-size:13px;}
+
+  /* --- JS Toggle Classes --- */
+  .hidden-post { display: none !important; }
+  .story-list.expanded .hidden-post { display: grid !important; }
+
+  /* --- Premium Tournaments/Events Section --- */
+  .groups-band{background:var(--pitch); color:var(--chalk);}
+  .groups-band .section-label{color:#B7CFC2;}
+  .groups-band .section-label::before{background:var(--volt);}
+  .groups-band .section-intro{color:#B7CFC2; margin-bottom: 40px;}
+  
+  .group-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:24px;}
+  @media (max-width:760px){ .group-grid{grid-template-columns:1fr;} }
+  
+  .group-card{
+    border:1px solid var(--pitch-line); 
+    border-radius:10px; 
+    padding:32px; 
+    background:rgba(255,255,255,.015); 
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .group-card:hover{
+    transform: translateY(-6px);
+    border-color: var(--volt);
+    box-shadow: 0 16px 32px -12px rgba(0,0,0,0.4);
+    background:rgba(255,255,255,.03);
+  }
+  .group-card .ghead{
+    display:flex; justify-content:space-between; align-items:baseline; 
+    margin-bottom:20px; 
+    border-bottom: 1px solid var(--pitch-line); 
+    padding-bottom: 16px;
+  }
+  .group-card h4{font-family:var(--font-display); font-weight:400; font-size:26px; letter-spacing: 0.02em;}
+  .group-card .gcount{font-family:var(--font-mono); font-size:12px; color:var(--volt); text-transform: uppercase; letter-spacing: 0.1em;}
+  
+  .group-card ul{display:flex; flex-direction:column; gap:0;}
+  .group-card li{border-bottom: 1px dashed rgba(255,255,255,0.1);}
+  .group-card li:last-child{border-bottom: none;}
+  
+  .group-card li a{
+    font-size:14.5px; 
+    color:#DCE6E1; 
+    line-height: 1.5; 
+    display: flex; 
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    transition: color 0.2s ease;
+  }
+  /* The sleek hover arrow effect */
+  .group-card li a::after {
+    content: "→";
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.2s ease;
+    color: var(--volt);
+    font-family: var(--font-mono);
+    font-weight: 700;
+  }
+  .group-card li a:hover{color:var(--volt);}
+  .group-card li a:hover::after {
+    opacity: 1;
+    transform: translateX(0);
+  }
 </style>
 
-<div class="breadcrumb">
-  <div class="wrap"><a href="/">Home</a><span class="sep">/</span><span class="current">{label}</span></div>
-</div>
+<div class="breadcrumb"><div class="wrap"><a href="/">Home</a><span class="sep">/</span><span class="current">{label}</span></div></div>
 
 <section class="hub-head">
   <div class="wrap">
-    <span class="eyebrow"><span class="dot"></span>Category</span>
+    <span class="eyebrow"><span class="dot"></span>{type === 'event' ? 'Multi-sport event' : 'Category'}</span>
     <h1>{label}</h1>
     <p>{posts.length} {posts.length === 1 ? 'story' : 'stories'} and counting.</p>
   </div>
 </section>
 
-<section class="hub-body">
+<section>
   <div class="wrap">
+    <div class="section-label">Latest {label} news</div>
+    <p class="section-intro">
+      {type === 'event'
+        ? `The newest ${label} stories, across every edition.`
+        : `The newest ${label} stories, most recent first.`}
+    </p>
     {posts.length === 0 ? (
       <p class="empty">No stories in this category yet — check back soon.</p>
     ) : (
-      <div class="story-list">
-        {posts.map((post) => {
-          const { day, month } = formatDate(post.data.date);
-          return (
-            <a class="story-row" href={`/posts/${post.id}`}>
-              <div class="date-block"><div class="d">{day}</div><div class="m">{month}</div></div>
-              <div><h3>{post.data.title}</h3></div>
-            </a>
-          );
-        })}
-      </div>
+      <>
+        <div class="story-list" id="latestNewsList">
+          {posts.map((post, index) => {
+            const { day, month } = formatDate(post.data.date);
+            return (
+              <a class={`story-row ${index >= 5 ? 'hidden-post' : ''}`} href={`/posts/${post.id}`}>
+                <div class="date-block"><div class="d">{day}</div><div class="m">{month}</div></div>
+                <div><h3 set:html={formatTitle(post.data.title)}></h3></div>
+              </a>
+            );
+          })}
+        </div>
+        
+        {posts.length > 5 && (
+          <div style="text-align: center; margin-top: 32px;">
+            <button id="viewMoreBtn" style="background: transparent; border: 1px solid var(--inkline); color: var(--ink); padding: 14px 28px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s ease;">
+              View all latest news ↓
+            </button>
+          </div>
+        )}
+      </>
     )}
   </div>
 </section>
+
+{sortedGroups.length > 0 && (
+  <section class="groups-band">
+    <div class="wrap">
+      <div class="section-label">{subSectionLabel}</div>
+      <h2 style="font-family: var(--font-display); font-size: clamp(32px, 5vw, 48px); font-weight: 400; margin-bottom: 12px; line-height: 1;">Explore by {type === 'event' ? 'Edition' : 'Tournament'}</h2>
+      <p class="section-intro">{subSectionIntro}</p>
+      
+      <div class="group-grid">
+        {sortedGroups.map(([groupName, groupPosts]) => (
+          <div class="group-card">
+            <div class="ghead">
+              <h4>
+                <a href={`/category/${slugify(label)}/${slugify(groupName)}`} style="color: inherit; transition: color 0.2s ease;">
+                  {formatGroupName(groupName)}
+                </a>
+              </h4>
+              <span class="gcount">{groupPosts.length} {groupPosts.length === 1 ? 'story' : 'stories'}</span>
+            </div>
+            <ul>
+              {groupPosts.slice(0, 5).map((p) => (
+                <li><a href={`/posts/${p.id}`} set:html={formatTitle(p.data.title)}></a></li>
+              ))}
+            </ul>
+            {groupPosts.length > 5 && (
+              <a href={`/category/${label.toLowerCase()}/${groupName.toLowerCase().replace(/\s+/g, '-')}`} 
+                 style="display: inline-block; margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--volt); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">
+                View all {groupPosts.length} stories →
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+)}
+
+<script>
+  const btn = document.getElementById('viewMoreBtn');
+  const list = document.getElementById('latestNewsList');
+  
+  if (btn && list) {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      list.classList.toggle('expanded');
+      
+      if (list.classList.contains('expanded')) {
+        btn.innerHTML = 'Show less ↑';
+      } else {
+        btn.innerHTML = 'View all latest news ↓';
+      }
+    });
+  }
+</script>
 </BaseLayout>

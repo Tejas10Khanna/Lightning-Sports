@@ -1,4 +1,5 @@
 ---
+import { categoryType } from '../lib/categoryTypes';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
 import { getTopViewedPostIds } from '../lib/views';
@@ -19,15 +20,26 @@ const topViewedPosts = topViewedIds
   .map((id) => allPosts.find((p) => p.id === id))
   .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
-// 3c. Real "Pick your sport" data — built from actual post categories,
-// no hardcoded tournament sub-links.
+// 3c. Real "Pick your sport" data — separated by type
 const categoryCounts = new Map<string, number>();
 for (const p of allPosts) {
-  categoryCounts.set(p.data.category, (categoryCounts.get(p.data.category) ?? 0) + 1);
+  // Ignore backend announcements from the UI grids
+  if (p.data.category !== 'Announcement') {
+    categoryCounts.set(p.data.category, (categoryCounts.get(p.data.category) ?? 0) + 1);
+  }
 }
-const featuredCategories = [...categoryCounts.entries()]
+
+// Grab top 4 continuous sports
+const topSports = [...categoryCounts.entries()]
+  .filter(([cat]) => categoryType(cat) === 'sport')
   .sort((a, b) => b[1] - a[1])
   .slice(0, 4);
+
+// Grab top 2 events
+const topEvents = [...categoryCounts.entries()]
+  .filter(([cat]) => categoryType(cat) === 'event')
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 2);
 
 const categoryLabel = (cat: string) =>
   cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -41,12 +53,22 @@ const formatDate = (date: Date | string) =>
   });
 // Helper to strip raw markdown formatting and images to create a clean text excerpt
 // 1. Helper to fix ALL CAPS titles and strip random quotes
+// Upgraded Helper to strip quotes and force perfect Title Case
 const formatTitle = (title: string) => {
   let clean = title.replace(/^["']|["']$/g, '');
-  // If the title is screaming in all caps, force it to Sentence case
-  if (clean === clean.toUpperCase()) {
-    clean = clean.charAt(0) + clean.slice(1).toLowerCase();
-  }
+  
+  // Forces the first letter of every word to be capitalized
+  clean = clean.replace(/\b\w/g, (match) => match.toUpperCase());
+  
+  // Fixes a few common small words so it looks like professional journalism (optional but recommended)
+  const smallWords = ['A', 'An', 'The', 'And', 'But', 'Or', 'For', 'Nor', 'On', 'At', 'To', 'From', 'By', 'With'];
+  clean = clean.split(' ').map((word, index) => {
+    if (index !== 0 && smallWords.includes(word)) {
+      return word.toLowerCase();
+    }
+    return word;
+  }).join(' ');
+
   return clean;
 };
 
@@ -310,10 +332,22 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
   .categories{background:var(--pitch); color:var(--chalk);}
   .categories .section-head .eyebrow{color:var(--volt);}
   .categories .section-head p{color:#B7CFC2;}
-  .cat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:18px;}
-  @media (max-width:920px){ .cat-grid{grid-template-columns:1fr 1fr;} }
-  @media (max-width:520px){ .cat-grid{grid-template-columns:1fr;} }
+.cat-grid{
+    display: flex; 
+    gap: 18px;
+    overflow-x: auto; 
+    scroll-snap-type: x mandatory; 
+    padding-bottom: 16px;
+  }
+  
+  /* Hides the ugly default scrollbar but keeps swipe functionality */
+  .cat-grid::-webkit-scrollbar { display: none; }
+  .cat-grid { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* --- UPGRADED: Fixed width snap tiles --- */
   .cat-tile{
+    flex: 0 0 280px; /* Forces each card to be exactly 280px wide */
+    scroll-snap-align: start; /* Snaps perfectly into place when swiping */
     border:1px solid var(--pitch-line);
     border-radius:6px;
     padding:26px 20px;
@@ -493,17 +527,36 @@ const generateCleanExcerpt = (body?: string, length: number = 150) => {
         <span class="eyebrow"><span class="dot"></span>Beats we cover</span>
         <h2>Pick your sport</h2>
       </div>
-      <p>Four beats, one newsroom. Dig into the coverage that matters to you.</p>
+      <p>Continuous coverage of the sports that matter, and the global events where they collide.</p>
     </div>
-    <div class="cat-grid">
-      {featuredCategories.map(([cat, count], i) => (
-        <a class="cat-tile" href={`/category/${cat}`} style="display:block;">
+    
+    <!-- Top Sports Grid -->
+    <div class="cat-grid" style="margin-bottom: 32px;">
+      {topSports.map(([cat, count], i) => (
+        <a class="cat-tile" href={`/category/${cat.toLowerCase().replace(/\s+/g, '-')}`} style="display:block;">
           <span class="num">{String(i + 1).padStart(2, '0')} / {categoryLabel(cat).toUpperCase()}</span>
           <h3>{categoryLabel(cat)}</h3>
           <p style="font-family:var(--font-mono); font-size:12px; color:#B7CFC2;">{count} {count === 1 ? 'story' : 'stories'}</p>
         </a>
       ))}
     </div>
+
+    <!-- Top Events Grid -->
+    {topEvents.length > 0 && (
+      <>
+        <h3 style="font-family:var(--font-mono); font-size:12px; color:#8B97A6; text-transform:uppercase; letter-spacing:0.1em; margin-bottom: 16px; border-top: 1px solid var(--pitch-line); padding-top: 24px;">Major Events</h3>
+        <div class="cat-grid" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 28px;">
+          {topEvents.map(([cat, count], i) => (
+            <a class="cat-tile" href={`/category/${cat.toLowerCase().replace(/\s+/g, '-')}`} style="display:block;">
+              <span class="num">EVENT / {categoryLabel(cat).toUpperCase()}</span>
+              <h3>{categoryLabel(cat)}</h3>
+              <p style="font-family:var(--font-mono); font-size:12px; color:#B7CFC2;">{count} {count === 1 ? 'story' : 'stories'}</p>
+            </a>
+          ))}
+        </div>
+      </>
+    )}
+
     <div style="text-align:center; margin-top:28px;">
       <a href="/sports" class="btn btn-ghost" style="border-color:var(--pitch-line); color:var(--chalk);">View all sports →</a>
     </div>
