@@ -6,7 +6,7 @@ backend:
   repo: Tejas10Khanna/Lightning-Sports 
   branch: main
   # Add this line, using YOUR new Vercel auth app URL:
-  base_url: https://lightning-sports-auth.vercel.app/
+  base_url: https://lightning-sports-auth-v2.vercel.app/
 
 # --- 2. FILE SAVING LOCATIONS ---
 media_folder: "src/content/posts/images"
