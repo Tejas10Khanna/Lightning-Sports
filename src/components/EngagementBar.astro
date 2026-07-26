@@ -1,0 +1,214 @@
+---
+// src/components/EngagementBar.astro
+// Client-side likes + comments, backed by Vercel KV.
+export interface Props {
+  postId: string;
+  initialLikes: number;
+}
+const { postId, initialLikes } = Astro.props;
+---
+<style>
+  .engage {
+    max-width: 68ch; margin: 60px auto 0;
+    padding: 0 var(--shell-pad);
+  }
+  .engage-bar {
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 24px 28px; border-radius: 999px;
+    border: 1px solid var(--t-line);
+    background: var(--t-surface);
+    box-shadow: 0 10px 30px -20px rgba(0,0,0,.6);
+  }
+  .like-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 20px; border-radius: 999px;
+    background: transparent; border: 1px solid var(--t-line);
+    color: var(--t-ink); font-family: var(--font-mono); font-size: 13px;
+    transition: all var(--dur-fast) var(--ease);
+  }
+  .like-btn:hover { border-color: var(--t-accent); color: var(--t-accent); }
+  .like-btn.liked { background: color-mix(in oklab, var(--t-pop) 18%, transparent); border-color: var(--t-pop); color: var(--t-pop); }
+  .like-btn.liked svg { fill: var(--t-pop); animation: burst .5s var(--ease); }
+  @keyframes burst { 0% {transform: scale(1);} 40% {transform: scale(1.4);} 100% {transform: scale(1);} }
+  .like-count { font-weight: 600; }
+
+  .share-list { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+  .share-list span.lbl { font-family: var(--font-mono); font-size: 11px; color: var(--t-ink-muted); letter-spacing: .1em; text-transform: uppercase; margin-right: 4px; }
+  .share-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid var(--t-line); display: inline-flex; align-items: center; justify-content: center;
+    color: var(--t-ink); transition: all var(--dur-fast);
+  }
+  .share-btn:hover { border-color: var(--t-accent); color: var(--t-accent); transform: translateY(-2px); }
+
+  .comments {
+    max-width: 68ch; margin: 40px auto 0;
+    padding: 0 var(--shell-pad);
+  }
+  .comments h3 {
+    font-family: var(--font-display); font-weight: 500;
+    font-size: 28px; letter-spacing: -.015em; margin-bottom: 24px;
+    color: var(--t-ink);
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  .comments h3 .count {
+    font-family: var(--font-mono); font-size: 12px; color: var(--t-accent);
+    text-transform: uppercase; letter-spacing: .14em; font-weight: 600;
+  }
+  .comment-form {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 22px; border-radius: 16px; border: 1px solid var(--t-line);
+    background: var(--t-surface); margin-bottom: 28px;
+  }
+  .comment-form input, .comment-form textarea {
+    background: var(--t-bg); border: 1px solid var(--t-line);
+    padding: 12px 14px; border-radius: 10px; color: var(--t-ink);
+    font-family: var(--font-body); font-size: 14px; outline: none;
+    transition: border-color var(--dur-fast);
+  }
+  .comment-form input:focus, .comment-form textarea:focus { border-color: var(--t-accent); }
+  .comment-form textarea { min-height: 90px; resize: vertical; }
+  .comment-form .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .comment-form .row input { flex: 1; min-width: 160px; }
+  .comment-form button { align-self: flex-end; padding: 12px 22px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; background: var(--t-accent); color: var(--t-bg); border-radius: 999px; }
+  .comment-form button:disabled { opacity: .6; cursor: wait; }
+
+  .c-status { font-family: var(--font-mono); font-size: 12px; }
+  .c-status.ok { color: var(--t-accent-2); }
+  .c-status.err { color: var(--t-pop); }
+
+  .comment-list { display: flex; flex-direction: column; gap: 16px; }
+  .comment-item {
+    padding: 18px 20px; border: 1px solid var(--t-line); border-radius: 14px;
+    background: var(--t-surface);
+  }
+  .c-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .c-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: color-mix(in oklab, var(--t-accent) 18%, transparent);
+    border: 1px solid color-mix(in oklab, var(--t-accent) 30%, transparent);
+    color: var(--t-accent); display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 500; font-size: 14px;
+  }
+  .c-name { font-weight: 600; color: var(--t-ink); font-size: 14px; }
+  .c-when { font-family: var(--font-mono); font-size: 11px; color: var(--t-ink-muted); margin-left: auto; }
+  .c-body { font-size: 14.5px; color: var(--t-ink); line-height: 1.6; }
+  .c-empty { text-align: center; padding: 30px 20px; color: var(--t-ink-muted); font-family: var(--font-mono); font-size: 12.5px; border: 1px dashed var(--t-line); border-radius: 12px; }
+</style>
+
+<div class="engage">
+  <div class="engage-bar">
+    <button class="like-btn" id="likeBtn" data-postid={postId} aria-label="Like this story">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      <span>Like</span>
+      <span class="like-count" id="likeCount">{initialLikes}</span>
+    </button>
+    <div class="share-list" role="group" aria-label="Share">
+      <span class="lbl">Share</span>
+      <a class="share-btn" id="shareTwitter" href="#" target="_blank" rel="noopener" aria-label="Share on X">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      </a>
+      <a class="share-btn" id="shareWa" href="#" target="_blank" rel="noopener" aria-label="Share on WhatsApp">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.2h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.51 2 12.04 2"/></svg>
+      </a>
+      <button class="share-btn" id="shareCopy" aria-label="Copy link">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="comments">
+  <h3>Reader thread <span class="count" id="cCount">0</span></h3>
+  <form class="comment-form" id="commentForm" data-postid={postId}>
+    <div class="row">
+      <input type="text" name="name" placeholder="Your name" maxlength="40" required />
+      <input type="text" name="team" placeholder="Team / city (optional)" maxlength="30" />
+    </div>
+    <textarea name="body" placeholder="Your take — what did we get right, or miss?" maxlength="800" required></textarea>
+    <div style="display:flex; align-items:center; gap: 12px; justify-content:flex-end;">
+      <span id="cStatus" class="c-status"></span>
+      <button type="submit">Post comment</button>
+    </div>
+  </form>
+  <div class="comment-list" id="commentList">
+    <div class="c-empty">Be the first to weigh in.</div>
+  </div>
+</div>
+
+<script>
+  const postId = document.getElementById('likeBtn')?.getAttribute('data-postid') || '';
+  const likeBtn = document.getElementById('likeBtn') as HTMLButtonElement;
+  const likeCount = document.getElementById('likeCount')!;
+  const likedKey = `ls_liked_${postId}`;
+  if (localStorage.getItem(likedKey)) likeBtn?.classList.add('liked');
+
+  likeBtn?.addEventListener('click', async () => {
+    const already = likeBtn.classList.contains('liked');
+    const delta = already ? -1 : 1;
+    likeBtn.classList.toggle('liked');
+    likeCount.textContent = String(Math.max(0, parseInt(likeCount.textContent || '0') + delta));
+    if (already) localStorage.removeItem(likedKey); else localStorage.setItem(likedKey, '1');
+    try { await fetch('/api/like', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId, delta }) }); } catch { /* ignore */ }
+  });
+
+  // Share
+  const shareUrl = window.location.href;
+  const shareText = document.title;
+  (document.getElementById('shareTwitter') as HTMLAnchorElement).href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+  (document.getElementById('shareWa') as HTMLAnchorElement).href = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+  document.getElementById('shareCopy')?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(shareUrl); const b = document.getElementById('shareCopy')!; const orig = b.innerHTML; b.innerHTML = '✓'; setTimeout(() => b.innerHTML = orig, 1200); } catch { /* ignore */ }
+  });
+
+  // Comments — load + submit
+  const cList = document.getElementById('commentList')!;
+  const cCount = document.getElementById('cCount')!;
+  const cForm = document.getElementById('commentForm') as HTMLFormElement;
+  const cStatus = document.getElementById('cStatus')!;
+
+  function timeAgo(iso: string) {
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    return Math.floor(diff/86400) + 'd ago';
+  }
+  function initials(n: string) { return n.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase() || '?'; }
+  function esc(s: string) { return s.replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c] as string)); }
+
+  async function loadComments() {
+    try {
+      const r = await fetch(`/api/comments?postId=${encodeURIComponent(postId)}`);
+      const data = await r.json();
+      const items: any[] = data.comments || [];
+      cCount.textContent = String(items.length);
+      if (!items.length) { cList.innerHTML = '<div class="c-empty">Be the first to weigh in.</div>'; return; }
+      cList.innerHTML = items.map(c => `
+        <div class="comment-item">
+          <div class="c-head">
+            <span class="c-avatar">${esc(initials(c.name))}</span>
+            <div><div class="c-name">${esc(c.name)}${c.team ? ` <span style="color:var(--t-ink-muted);font-weight:400;font-size:12px;">· ${esc(c.team)}</span>` : ''}</div></div>
+            <span class="c-when">${timeAgo(c.at)}</span>
+          </div>
+          <p class="c-body">${esc(c.body).replace(/\n/g,'<br/>')}</p>
+        </div>`).join('');
+    } catch { /* ignore */ }
+  }
+  loadComments();
+
+  cForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = cForm.querySelector('button') as HTMLButtonElement;
+    btn.disabled = true; cStatus.textContent = 'Posting…'; cStatus.className = 'c-status';
+    const fd = new FormData(cForm);
+    const payload = { postId, name: fd.get('name'), team: fd.get('team'), body: fd.get('body') };
+    try {
+      const r = await fetch('/api/comments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) { cStatus.textContent = 'Posted.'; cStatus.className = 'c-status ok'; cForm.reset(); await loadComments(); }
+      else { cStatus.textContent = 'Could not post — try again.'; cStatus.className = 'c-status err'; }
+    } catch { cStatus.textContent = 'Network hiccup.'; cStatus.className = 'c-status err'; }
+    btn.disabled = false;
+    setTimeout(()=>{cStatus.textContent=''; cStatus.className='c-status';}, 3000);
+  });
+</script>

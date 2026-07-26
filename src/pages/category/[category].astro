@@ -1,25 +1,12 @@
 ---
-// src/pages/category/[category].astro
+// src/pages/category/[category].astro — Sport-themed hub
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { categoryType, slugify } from '../../lib/categoryTypes';
+import { themeFor } from '../../lib/themes';
 
-const formatTitle = (title: string) => {
-  let clean = title.replace(/^["']|["']$/g, '');
-  clean = clean.replace(/\b\w/g, (match) => match.toUpperCase());
-  const smallWords = ['A', 'An', 'The', 'And', 'But', 'Or', 'For', 'Nor', 'On', 'At', 'To', 'From', 'By', 'With'];
-  clean = clean.split(' ').map((word, index) => {
-    if (index !== 0 && smallWords.includes(word)) {
-      return word.toLowerCase();
-    }
-    return word;
-  }).join(' ');
-  return clean;
-};
-
-const formatGroupName = (name: string) => {
-  return name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-};
+const formatTitle = (title: string) => title.replace(/^["']|["']$/g, '');
+const formatGroupName = (name: string) => name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 function getSubLabel(rawTags: string[] | undefined, category: string): string | null {
   if (!rawTags) return null;
@@ -34,12 +21,8 @@ function getSubLabel(rawTags: string[] | undefined, category: string): string | 
 export async function getStaticPaths() {
   const allPosts = await getCollection('posts');
   const bySlug = new Map<string, { label: string; posts: typeof allPosts }>();
-
   for (const p of allPosts) {
-    // UPGRADE: This safely handles both single strings AND arrays so older posts don't break
     const categories = Array.isArray(p.data.category) ? p.data.category : [p.data.category];
-    
-    // Loops through every category the author typed and adds the post to ALL of them!
     for (const catLabel of categories) {
       if (!catLabel) continue;
       const slug = slugify(catLabel);
@@ -47,18 +30,15 @@ export async function getStaticPaths() {
       bySlug.get(slug)!.posts.push(p);
     }
   }
-
   return [...bySlug.entries()].map(([slug, { label, posts }]) => ({
     params: { category: slug },
-    props: {
-      label,
-      posts: posts.sort((a: any, b: any) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf()),
-    },
+    props: { label, posts: posts.sort((a: any, b: any) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf()) },
   }));
 }
 
 const { label, posts } = Astro.props;
 const type = categoryType(label);
+const theme = themeFor(label);
 
 const groups = new Map<string, typeof posts>();
 for (const post of posts) {
@@ -67,158 +47,124 @@ for (const post of posts) {
   if (!groups.has(sub)) groups.set(sub, []);
   groups.get(sub)!.push(post);
 }
+const sortedGroups = type === 'event'
+  ? [...groups.entries()].sort((a, b) => Math.max(...b[1].map((p) => new Date(p.data.date).valueOf())) - Math.max(...a[1].map((p) => new Date(p.data.date).valueOf())))
+  : [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
 
-const sortedGroups =
-  type === 'event'
-    ? [...groups.entries()].sort((a, b) => {
-        const aLatest = Math.max(...a[1].map((p) => new Date(p.data.date).valueOf()));
-        const bLatest = Math.max(...b[1].map((p) => new Date(p.data.date).valueOf()));
-        return bLatest - aLatest;
-      })
-    : [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
-
-const subSectionLabel = type === 'event' ? 'Past & upcoming editions' : 'Major tournaments';
-const subSectionIntro =
-  type === 'event'
-    ? `Every edition of ${label} we've covered, most recent first.`
-    : `The tournaments driving ${label} coverage, most covered first.`;
-
-function formatDate(d: Date | string) {
+function fmt(d: Date | string) {
   const date = new Date(d);
-  return {
-    day: date.toLocaleDateString('en-US', { day: '2-digit' }),
-    month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
-  };
+  return { day: date.toLocaleDateString('en-US', { day: '2-digit' }), month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() };
 }
 ---
-<BaseLayout title={`${label} — Lightning Sports`} description={`Every ${label} story from Lightning Sports.`}>
+<BaseLayout title={`${label} — Lightning Sports`} description={`Every ${label} story from Lightning Sports.`} sport={label}>
 <style>
-  .hub-head{background:var(--ink); color:var(--chalk); padding:48px 0 40px;}
-  .hub-head .eyebrow{color:var(--scarlet); margin-bottom:16px;}
-  .hub-head h1{font-family:var(--font-display); font-weight:400; font-size:clamp(38px,6vw,64px); line-height:1;}
-  .hub-head p{color:var(--slate); margin-top:14px; font-size:15px;}
+  .hub-hero {
+    position: relative; padding: 60px 0 40px; 
+    background: var(--t-gradient), linear-gradient(180deg, var(--t-bg), var(--t-surface));
+    overflow: hidden;
+  }
+  .hub-hero .wrap { position: relative; z-index: 2; }
+  .hub-hero .kicker { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .2em; color: var(--t-accent); margin-bottom: 16px; display: inline-flex; align-items: center; gap: 10px; }
+  .hub-hero .kicker::before { content:""; width: 40px; height: 1px; background: var(--t-accent); }
+  .hub-hero h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(40px, 8vw, 84px);
+    line-height: 1.05; letter-spacing: -.02em;
+    color: var(--t-ink); margin-bottom: 16px;
+  }
+  .hub-hero .motto { font-family: var(--font-editorial); font-style: italic; font-size: clamp(18px, 2.2vw, 24px); color: var(--t-ink-muted); margin-bottom: 20px; max-width: 44ch; }
+  .hub-hero .count-badge { font-family: var(--font-mono); font-size: 13px; color: var(--t-ink); background: color-mix(in oklab, var(--t-accent) 15%, transparent); border: 1px solid color-mix(in oklab, var(--t-accent) 30%, transparent); padding: 8px 16px; border-radius: 999px; display: inline-block; }
 
-  section{padding:64px 0;}
-  .section-label{font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:10px; display:flex; align-items:center; gap:8px;}
-  .section-label::before{content:""; width:16px; height:2px; background:var(--scarlet);}
-  .section-intro{color:#8A8570; font-size:14px; margin-bottom:28px; max-width:56ch;}
+  section.band { padding: 60px 0; }
+  .section-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-accent); margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+  .section-label::before { content: ""; width: 24px; height: 2px; background: var(--t-accent); }
+  .section-intro { color: var(--t-ink-muted); font-size: 14.5px; margin-bottom: 30px; max-width: 56ch; }
+  h2.big { font-family: var(--font-display); font-weight: 400; font-size: clamp(28px, 4vw, 46px); letter-spacing: -.02em; line-height: 1.02; margin-bottom: 14px; color: var(--t-ink); }
+  h2.big em { font-family: var(--font-editorial); font-style: italic; color: var(--t-accent); }
 
-  .story-list{display:flex; flex-direction:column;}
-  .story-row{display:grid; grid-template-columns:90px 1fr; gap:18px; align-items:center; padding:18px 0; border-bottom:1px solid #DEDACB; transition:background .15s ease;}
-  .story-row:hover{background:rgba(15,46,34,.03);}
-  .date-block{font-family:var(--font-mono); text-align:center; background:var(--ink); color:var(--chalk); border-radius:6px; padding:9px 4px;}
-  .date-block .d{font-family:var(--font-display); font-size:18px; color:var(--volt); line-height:1;}
-  .date-block .m{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; margin-top:3px; color:var(--slate);}
-  .story-row h3{font-size:16.5px; font-weight:700; line-height:1.35; color: var(--ink);}
-  .empty{padding:40px 0; text-align:center; color:#5b6472; font-family:var(--font-mono); font-size:13px;}
-
-  /* --- JS Toggle Classes --- */
+  /* Story list - COMPACTED */
+  .story-list { display: flex; flex-direction: column; }
+  .story-row { 
+    display: grid; grid-template-columns: 70px 1fr auto; gap: 18px; align-items: center; 
+    padding: 14px 0; border-bottom: 1px solid var(--t-line); transition: all var(--dur-fast); 
+  }
+  .story-row:hover { background: color-mix(in oklab, var(--t-accent) 4%, transparent); padding-left: 12px; padding-right: 12px; border-radius: 8px; }
+  
+  .date-block { text-align: center; padding: 6px 8px; border-radius: 8px; background: var(--t-surface); border: 1px solid var(--t-line); }
+  .date-block .d { font-family: var(--font-display); font-size: 18px; color: var(--t-accent); line-height: 1; font-weight: 500; }
+  .date-block .m { font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em; color: var(--t-ink-muted); margin-top: 2px; }
+  
+  .story-row h3 { font-family: var(--font-display); font-weight: 400; font-size: 17px; line-height: 1.3; letter-spacing: -.005em; color: var(--t-ink); }
+  .arrow { font-family: var(--font-mono); font-size: 18px; color: var(--t-accent); opacity: 0; transform: translateX(-10px); transition: all var(--dur-fast); }
+  .story-row:hover .arrow { opacity: 1; transform: translateX(0); }
+  
   .hidden-post { display: none !important; }
   .story-list.expanded .hidden-post { display: grid !important; }
+  .empty { padding: 60px 20px; text-align: center; color: var(--t-ink-muted); font-family: var(--font-mono); font-size: 13px; border: 1px dashed var(--t-line); border-radius: 12px; }
 
-  /* --- Premium Tournaments/Events Section --- */
-  .groups-band{background:var(--pitch); color:var(--chalk);}
-  .groups-band .section-label{color:#B7CFC2;}
-  .groups-band .section-label::before{background:var(--volt);}
-  .groups-band .section-intro{color:#B7CFC2; margin-bottom: 40px;}
-  
-  .group-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:24px;}
-  @media (max-width:760px){ .group-grid{grid-template-columns:1fr;} }
-  
-  .group-card{
-    border:1px solid var(--pitch-line); 
-    border-radius:10px; 
-    padding:32px; 
-    background:rgba(255,255,255,.015); 
-    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
-    display: flex;
-    flex-direction: column;
-  }
-  .group-card:hover{
-    transform: translateY(-6px);
-    border-color: var(--volt);
-    box-shadow: 0 16px 32px -12px rgba(0,0,0,0.4);
-    background:rgba(255,255,255,.03);
-  }
-  .group-card .ghead{
-    display:flex; justify-content:space-between; align-items:baseline; 
-    margin-bottom:20px; 
-    border-bottom: 1px solid var(--pitch-line); 
-    padding-bottom: 16px;
-  }
-  .group-card h4{font-family:var(--font-display); font-weight:400; font-size:26px; letter-spacing: 0.02em;}
-  .group-card .gcount{font-family:var(--font-mono); font-size:12px; color:var(--volt); text-transform: uppercase; letter-spacing: 0.1em;}
-  
-  .group-card ul{display:flex; flex-direction:column; gap:0;}
-  .group-card li{border-bottom: 1px dashed rgba(255,255,255,0.1);}
-  .group-card li:last-child{border-bottom: none;}
-  
-  .group-card li a{
-    font-size:14.5px; 
-    color:#DCE6E1; 
-    line-height: 1.5; 
-    display: flex; 
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 0;
-    transition: color 0.2s ease;
-  }
-  /* The sleek hover arrow effect */
-  .group-card li a::after {
-    content: "→";
-    opacity: 0;
-    transform: translateX(-10px);
-    transition: all 0.2s ease;
-    color: var(--volt);
-    font-family: var(--font-mono);
-    font-weight: 700;
-  }
-  .group-card li a:hover{color:var(--volt);}
-  .group-card li a:hover::after {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  .view-more-btn { background: transparent; border: 1px solid var(--t-line); color: var(--t-ink); padding: 12px 24px; border-radius: 999px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; cursor: pointer; transition: all var(--dur-fast); }
+  .view-more-btn:hover { border-color: var(--t-accent); color: var(--t-accent); }
+
+  /* Tournaments/editions band */
+  .groups-band { background: var(--t-surface); border-top: 1px solid var(--t-line); border-bottom: 1px solid var(--t-line); }
+  .group-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  @media (max-width: 760px) { .group-grid { grid-template-columns: 1fr; } }
+  .group-card { border: 1px solid var(--t-line); border-radius: 16px; padding: 26px; background: var(--t-bg); transition: all var(--dur) var(--ease); display: flex; flex-direction: column; }
+  .group-card:hover { transform: translateY(-4px); border-color: var(--t-accent); box-shadow: 0 16px 40px -20px var(--t-accent); }
+  .group-card .ghead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; border-bottom: 1px solid var(--t-line); padding-bottom: 14px; }
+  .group-card h4 { font-family: var(--font-display); font-weight: 400; font-size: 22px; letter-spacing: -.01em; }
+  .group-card h4 a { color: var(--t-ink); transition: color var(--dur-fast); }
+  .group-card h4 a:hover { color: var(--t-accent); }
+  .group-card .gcount { font-family: var(--font-mono); font-size: 10px; color: var(--t-accent); text-transform: uppercase; letter-spacing: .12em; }
+  .group-card ul { display: flex; flex-direction: column; gap:0; padding:0; margin:0;}
+  .group-card li { border-bottom: 1px dashed var(--t-line); list-style:none; }
+  .group-card li:last-child { border-bottom: none; }
+  .group-card li a { font-size: 14px; color: var(--t-ink); line-height: 1.5; display: flex; justify-content: space-between; align-items: center; padding: 12px 0; transition: color var(--dur-fast); }
+  .group-card li a::after { content: "→"; opacity: 0; transform: translateX(-10px); transition: all var(--dur-fast); color: var(--t-accent); font-family: var(--font-mono); }
+  .group-card li a:hover { color: var(--t-accent); }
+  .group-card li a:hover::after { opacity: 1; transform: translateX(0); }
 </style>
 
-<div class="breadcrumb"><div class="wrap"><a href="/">Home</a><span class="sep">/</span><span class="current">{label}</span></div></div>
+<div class="breadcrumb"><div class="wrap"><a href="/">Home</a><span class="sep">/</span><a href="/sports">Sports</a><span class="sep">/</span><span class="current">{label}</span></div></div>
 
-<section class="hub-head">
-  <div class="wrap">
-    <span class="eyebrow"><span class="dot"></span>{type === 'event' ? 'Multi-sport event' : 'Category'}</span>
+<section class="hub-hero">
+  <div class="wrap" data-reveal>
+    <div class="kicker">{theme.kicker}</div>
     <h1>{label}</h1>
-    <p>{posts.length} {posts.length === 1 ? 'story' : 'stories'} and counting.</p>
+    <p class="motto">{theme.motto}</p>
+    <span class="count-badge">◆ {posts.length} {posts.length === 1 ? 'story' : 'stories'} on the desk</span>
   </div>
 </section>
 
-<section>
+<section class="band">
   <div class="wrap">
-    <div class="section-label">Latest {label} news</div>
+    <div class="section-label">Latest {label}</div>
+    <h2 class="big">The <em>freshest</em> takes</h2>
     <p class="section-intro">
-      {type === 'event'
-        ? `The newest ${label} stories, across every edition.`
-        : `The newest ${label} stories, most recent first.`}
+      {type === 'event' ? `The newest ${label} stories, across every edition.` : `The newest ${label} stories, most recent first.`}
     </p>
     {posts.length === 0 ? (
-      <p class="empty">No stories in this category yet — check back soon.</p>
+      <div class="empty">No stories in this beat yet — check back soon.</div>
     ) : (
       <>
-        <div class="story-list" id="latestNewsList">
+        <div class="story-list" id="latestNewsList" data-reveal>
           {posts.map((post, index) => {
-            const { day, month } = formatDate(post.data.date);
+            const { day, month } = fmt(post.data.date);
             return (
-              <a class={`story-row ${index >= 5 ? 'hidden-post' : ''}`} href={`/posts/${post.id}`}>
+              /* CHANGED: index >= 4 instead of 6 to show fewer initial posts */
+              <a class={`story-row ${index >= 4 ? 'hidden-post' : ''}`} href={`/posts/${post.id}`}>
                 <div class="date-block"><div class="d">{day}</div><div class="m">{month}</div></div>
-                <div><h3 set:html={formatTitle(post.data.title)}></h3></div>
+                <h3>{formatTitle(post.data.title)}</h3>
+                <span class="arrow">→</span>
               </a>
             );
           })}
         </div>
-        
-        {posts.length > 5 && (
-          <div style="text-align: center; margin-top: 32px;">
-            <button id="viewMoreBtn" style="background: transparent; border: 1px solid var(--inkline); color: var(--ink); padding: 14px 28px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s ease;">
-              View all latest news ↓
-            </button>
+        {/* CHANGED: Show view more button if there are more than 4 posts */}
+        {posts.length > 4 && (
+          <div style="text-align:center; margin-top:30px;">
+            <button id="viewMoreBtn" class="view-more-btn">View all latest ↓</button>
           </div>
         )}
       </>
@@ -227,34 +173,25 @@ function formatDate(d: Date | string) {
 </section>
 
 {sortedGroups.length > 0 && (
-  <section class="groups-band">
+  <section class="band groups-band">
     <div class="wrap">
-      <div class="section-label">{subSectionLabel}</div>
-      <h2 style="font-family: var(--font-display); font-size: clamp(32px, 5vw, 48px); font-weight: 400; margin-bottom: 12px; line-height: 1;">Explore by {type === 'event' ? 'Edition' : 'Tournament'}</h2>
-      <p class="section-intro">{subSectionIntro}</p>
-      
+      <div class="section-label">{type === 'event' ? 'Editions covered' : 'Tournaments covered'}</div>
+      <h2 class="big">Explore by <em>{type === 'event' ? 'edition' : 'tournament'}</em></h2>
+      <p class="section-intro">
+        {type === 'event' ? `Every edition of ${label} we've covered, most recent first.` : `The tournaments driving ${label} coverage, most covered first.`}
+      </p>
       <div class="group-grid">
         {sortedGroups.map(([groupName, groupPosts]) => (
-          <div class="group-card">
+          <div class="group-card" data-reveal>
             <div class="ghead">
-              <h4>
-                <a href={`/category/${slugify(label)}/${slugify(groupName)}`} style="color: inherit; transition: color 0.2s ease;">
-                  {formatGroupName(groupName)}
-                </a>
-              </h4>
+              <h4><a href={`/category/${slugify(label)}/${slugify(groupName)}`}>{formatGroupName(groupName)}</a></h4>
               <span class="gcount">{groupPosts.length} {groupPosts.length === 1 ? 'story' : 'stories'}</span>
             </div>
             <ul>
               {groupPosts.slice(0, 5).map((p) => (
-                <li><a href={`/posts/${p.id}`} set:html={formatTitle(p.data.title)}></a></li>
+                <li><a href={`/posts/${p.id}`}>{formatTitle(p.data.title)}</a></li>
               ))}
             </ul>
-            {groupPosts.length > 5 && (
-              <a href={`/category/${label.toLowerCase()}/${groupName.toLowerCase().replace(/\s+/g, '-')}`} 
-                 style="display: inline-block; margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--volt); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">
-                View all {groupPosts.length} stories →
-              </a>
-            )}
           </div>
         ))}
       </div>
@@ -265,18 +202,9 @@ function formatDate(d: Date | string) {
 <script>
   const btn = document.getElementById('viewMoreBtn');
   const list = document.getElementById('latestNewsList');
-  
-  if (btn && list) {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      list.classList.toggle('expanded');
-      
-      if (list.classList.contains('expanded')) {
-        btn.innerHTML = 'Show less ↑';
-      } else {
-        btn.innerHTML = 'View all latest news ↓';
-      }
-    });
-  }
+  btn?.addEventListener('click', () => {
+    const on = list?.classList.toggle('expanded');
+    btn.textContent = on ? 'Show less ↑' : 'View all latest ↓';
+  });
 </script>
 </BaseLayout>

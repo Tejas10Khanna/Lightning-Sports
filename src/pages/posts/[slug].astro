@@ -1,145 +1,165 @@
 ---
-export const prerender = false; // CRITICAL: without this, kv.incr() only ran once at build time, not per visitor
+// src/pages/posts/[slug].astro
+export const prerender = false;
 
 import { kv } from '@vercel/kv';
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import EngagementBar from '../../components/EngagementBar.astro';
 import { slugify } from '../../lib/categoryTypes';
+import { getFirstImage } from '../../lib/postImages';
 
-// 1. Generate the static paths for all markdown posts
-export async function getStaticPaths() {
-  const posts = await getCollection('posts');
-  return posts.map((post) => ({
-    params: { slug: post.id },
-    props: { post },
-  }));
+// FIX: Fetch the post dynamically using the URL param instead of getStaticPaths
+const { slug } = Astro.params;
+const allPosts = await getCollection('posts');
+const post = allPosts.find((p) => p.id === slug);
+
+// If post isn't found, redirect to 404 instead of crashing
+if (!post) {
+  return Astro.redirect('/404');
 }
 
-// 2. Extract the current post data from Astro.props
-const { post } = Astro.props;
 const { Content } = await render(post);
 
-// category is now always treated as an array (matches the CMS's multi-category
-// list field) — a post can genuinely belong to more than one category
-// (e.g. a cricket story that's also part of Olympics coverage).
-const postCategories: string[] = Array.isArray(post.data.category)
-  ? post.data.category
-  : [post.data.category];
+const postCategories: string[] = Array.isArray(post.data.category) ? post.data.category : [post.data.category];
 const primaryCategory = postCategories[0] ?? 'Sports';
 
-// 3. Track the view count — now actually runs per real visitor thanks to prerender:false above
 if (import.meta.env.PROD && post.id) {
-  try {
-    await kv.incr(`views:${post.id}`);
-  } catch (error) {
-    console.error('Failed to update database view count:', error);
-  }
+  try { await kv.incr(`views:${post.id}`); } catch { /* ignore */ }
 }
 
-// 4. Pull related posts sharing ANY category with this post, excluding itself
-const allPosts = await getCollection('posts');
+let views = 0;
+let likes = 0;
+try {
+  views = (await kv.get<number>(`views:${post.id}`)) || 0;
+  likes = (await kv.get<number>(`likes:${post.id}`)) || 0;
+} catch { /* ignore */ }
+
 const related = allPosts
-  .filter((p) => {
-    if (p.id === post.id) return false;
-    const pCats = Array.isArray(p.data.category) ? p.data.category : [p.data.category];
-    return pCats.some((c) => postCategories.includes(c));
-  })
+  .filter((p) => p.id !== post.id && (Array.isArray(p.data.category) ? p.data.category : [p.data.category]).some((c: string) => postCategories.includes(c)))
   .slice(0, 3);
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-  }).toUpperCase();
-}
+const heroImage = getFirstImage(post.body);
+function fmt(d: Date) { return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); }
+const cleanTitle = (title: string) => title.replace(/^["']|["']$/g, '');
+
+const words = (post.body || '').split(/\s+/).length;
+const readMin = Math.max(1, Math.round(words / 200));
 ---
-<BaseLayout title={`${post.data.title} — Lightning Sports`} description={post.data.dek}>
+<BaseLayout title={`${post.data.title} — Lightning Sports`} description={post.data.dek} sport={primaryCategory}>
 <style>
-  .article-head{background:var(--ink); color:var(--chalk); padding:52px 0 46px;}
-  .article-head .tag{display:inline-block; font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; padding:6px 12px; border-radius:20px; background:var(--pitch); color:var(--volt); margin-bottom:22px;}
-  .article-head h1{font-family:var(--font-display); font-weight:400; font-size:clamp(32px,5.2vw,56px); line-height:1.06; max-width:22ch; margin-bottom:22px;}
-  .article-head .dek{font-size:18px; color:var(--slate); max-width:60ch; margin-bottom:30px;}
-  .byline-row{display:flex; align-items:center; gap:16px; border-top:1px solid var(--inkline); padding:22px 0;}
-  .avatar{width:42px; height:42px; border-radius:50%; background:var(--pitch); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); color:var(--volt); font-size:16px; flex:none;}
-  .byline .name{font-weight:700; font-size:14px;}
-  .byline .meta{font-family:var(--font-mono); font-size:12px; color:var(--slate); margin-top:2px;}
+  .article-hero {
+    position: relative;
+    padding: 60px 0 40px; /* FIX: Reduced padding */
+    background: var(--t-bg); /* FIX: Removed aggressive gradient hiding text */
+  }
+  .article-hero .wrap { position: relative; z-index: 2; max-width: 940px; }
 
-  .article-body-wrap{padding:56px 0 88px;}
-  .prose{max-width:70ch; margin:0 auto; font-size:17px; color:#242C38;}
-  .prose :global(p){margin-bottom:22px;}
-  .prose :global(h2){font-family:var(--font-display); font-weight:400; font-size:26px; margin:40px 0 16px;}
-  .prose :global(blockquote){border-left:3px solid var(--volt); background:var(--pitch); color:var(--chalk); padding:22px 26px; margin:32px 0; font-size:19px; font-weight:600; border-radius:0 6px 6px 0;}
+  .tag-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .cat-tag {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em;
+    text-transform: uppercase; font-weight: 600;
+    padding: 8px 14px; border-radius: 999px;
+    background: color-mix(in oklab, var(--t-accent) 15%, transparent);
+    color: var(--t-accent);
+    border: 1px solid color-mix(in oklab, var(--t-accent) 30%, transparent);
+  }
 
-  .tags-row{display:flex; gap:10px; flex-wrap:wrap; margin:36px auto 0; max-width:70ch; padding-top:28px; border-top:1px dashed #DEDACB;}
-  .tags-row a{font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; padding:7px 14px; border:1px solid #DEDACB; border-radius:20px; color:#5b6472;}
-  .tags-row a:hover{border-color:var(--ink); color:var(--ink);}
+  .article-hero h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(32px, 5vw, 64px); /* FIX: Scaled down massive font */
+    line-height: 1.1; letter-spacing: -.02em;
+    color: var(--t-ink);
+    margin-bottom: 24px;
+  }
+  .article-hero .dek {
+    font-family: var(--font-editorial); font-style: italic;
+    font-size: clamp(18px, 2vw, 24px);
+    color: var(--t-ink-muted); line-height: 1.5;
+    max-width: 55ch; margin-bottom: 30px;
+  }
 
-  .related{background:var(--pitch); color:var(--chalk); padding:70px 0;}
-  .related h2{font-family:var(--font-display); font-weight:400; font-size:clamp(24px,3.6vw,32px); margin-bottom:34px;}
-  .related-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px;}
-  @media (max-width:820px){ .related-grid{grid-template-columns:1fr 1fr;} }
-  @media (max-width:560px){ .related-grid{grid-template-columns:1fr;} }
-  .related-card{border:1px solid var(--pitch-line); border-radius:6px; padding:20px; background:rgba(255,255,255,.02); transition:border-color .15s ease, transform .15s ease;}
-  .related-card:hover{border-color:var(--volt); transform:translateY(-3px);}
-  .related-card .tag{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--volt); letter-spacing:.08em;}
-  .related-card h4{font-size:14.5px; font-weight:700; margin:10px 0 12px; line-height:1.35;}
-  .related-card .meta{font-family:var(--font-mono); font-size:11px; color:#B7CFC2;}
+  .byline {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 20px 0; border-top: 1px solid var(--t-line);
+  }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in oklab, var(--t-accent) 18%, transparent);
+    border: 1px solid color-mix(in oklab, var(--t-accent) 30%, transparent);
+    color: var(--t-accent);
+    font-family: var(--font-display); font-size: 15px; font-weight: 500;
+  }
+  .byline-info { display: flex; flex-direction: column; }
+  .byline-info .name { font-weight: 600; font-size: 14px; color: var(--t-ink); }
+  .byline-info .meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--t-ink-muted); margin-top: 3px; }
+  .byline-stats { margin-left: auto; display: flex; gap: 20px; font-family: var(--font-mono); font-size: 11.5px; color: var(--t-ink-muted); }
+  .byline-stats b { color: var(--t-ink); font-weight: 500; }
+
+  .hero-image {
+    max-width: 1000px; margin: 20px auto 40px; padding: 0 var(--shell-pad);
+  }
+  .hero-image img {
+    width: 100%; border-radius: 16px; aspect-ratio: 16 / 9; object-fit: cover;
+    border: 1px solid var(--t-line);
+  }
+
+  .article-wrap { background: var(--t-bg); padding: 20px 0 60px; }
+  .prose {
+    max-width: 68ch; margin: 0 auto;
+    font-family: var(--font-editorial);
+    font-size: 20px; line-height: 1.75;
+    color: var(--t-ink);
+    padding: 0 var(--shell-pad);
+  }
+  .prose :global(p) { margin-bottom: 26px; }
+  .prose :global(h1), .prose :global(h2) {
+    font-family: var(--font-display); font-weight: 500;
+    font-size: 28px; line-height: 1.2; margin: 40px 0 20px; color: var(--t-ink);
+  }
+  .prose :global(a) { color: var(--t-accent); text-decoration: underline; }
+  .prose :global(img) { max-width: 100%; border-radius: 12px; margin: 30px auto; }
 </style>
 
 <div class="breadcrumb">
   <div class="wrap">
     <a href="/">Home</a><span class="sep">/</span>
     <a href={`/category/${slugify(primaryCategory)}`}>{primaryCategory}</a><span class="sep">/</span>
-    <span class="current">{post.data.title}</span>
+    <span class="current">{cleanTitle(post.data.title).slice(0, 60)}</span>
   </div>
 </div>
 
-<section class="article-head">
-  <div class="wrap">
-    {postCategories.map((c) => <span class="tag" style="margin-right:8px;">{c}</span>)}
-    <h1>{post.data.title}</h1>
+<section class="article-hero">
+  <div class="wrap" data-reveal>
+    <div class="tag-row">
+      {postCategories.map((c) => (<a href={`/category/${slugify(c)}`} class="cat-tag">{c}</a>))}
+    </div>
+    <h1>{cleanTitle(post.data.title)}</h1>
     {post.data.dek && <p class="dek">{post.data.dek}</p>}
-    <div class="byline-row">
-      <div class="avatar">{post.data.author.split(' ').map((n: string) => n[0]).join('')}</div>
-      <div class="byline">
-        <div class="name">{post.data.author}</div>
-        <div class="meta">{formatDate(post.data.date)}</div>
+    <div class="byline">
+      <div class="avatar">{post.data.author.split(' ').map((n: string) => n[0]).join('').slice(0,2)}</div>
+      <div class="byline-info">
+        <span class="name">{post.data.author}</span>
+        <span class="meta">{fmt(post.data.date)} · {readMin} min read</span>
+      </div>
+      <div class="byline-stats">
+        <span><b>{views.toLocaleString()}</b> views</span>
+        <span><b>{likes.toLocaleString()}</b> likes</span>
       </div>
     </div>
   </div>
 </section>
 
-<section class="article-body-wrap">
-  <div class="wrap">
-    <article class="prose">
-      <Content />
-    </article>
-    {post.data.tags && (
-      <div class="tags-row">
-        {post.data.tags.map((t: string) => <a href={`/category/${slugify(primaryCategory)}`}>{t}</a>)}
-      </div>
-    )}
+{heroImage && (
+  <div class="hero-image" data-reveal>
+    <img src={heroImage} alt={post.data.title} loading="eager" />
   </div>
-</section>
-
-{related.length > 0 && (
-  <section class="related">
-    <div class="wrap">
-      <h2>More from {primaryCategory}</h2>
-      <div class="related-grid">
-        {related.map((r) => {
-          const rCats = Array.isArray(r.data.category) ? r.data.category : [r.data.category];
-          return (
-            <a class="related-card" href={`/posts/${r.id}`}>
-              <span class="tag">{rCats[0]}</span>
-              <h4>{r.data.title}</h4>
-              <span class="meta">{formatDate(r.data.date)}</span>
-            </a>
-          );
-        })}
-      </div>
-    </div>
-  </section>
 )}
+
+<section class="article-wrap">
+  <article class="prose"><Content /></article>
+  <EngagementBar postId={post.id} initialLikes={likes} />
+</section>
 </BaseLayout>
