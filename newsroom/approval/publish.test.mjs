@@ -16,12 +16,12 @@ const packet = {
   ],
 };
 
-test('generates stable Astro article Markdown and includes source links without private notes', () => {
+test('generates stable Astro article Markdown while keeping evidence out of the article', () => {
   const article = prepareArticle(packet, revision, date);
   assert.equal(article.path, 'src/content/posts/2026-11-22-a-score-of-50-what-changed-1234567890ab.md');
   assert.match(article.markdown, /mainSport: \["Cricket"\]/);
   assert.match(article.markdown, /aiAssisted: true/);
-  assert.match(article.markdown, /\[E1\]\(<https:\/\/cricket\.example\/score\?team=a&season=1>\)/);
+  assert.doesNotMatch(article.markdown, /\[E1\]|cricket\.example/);
   assert.match(article.markdown, /\\!\\\[hidden\\\]/);
   assert.doesNotMatch(article.markdown, /<div>|Private evidence note/);
   assert.equal(prepareArticle(packet, revision, date).markdown, article.markdown);
