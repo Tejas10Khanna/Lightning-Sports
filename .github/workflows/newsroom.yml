@@ -1,0 +1,72 @@
+name: Newsroom intake
+
+on:
+  pull_request:
+    paths:
+      - 'newsroom/**'
+      - '.github/workflows/newsroom.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: newsroom
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+
+  collect:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.NEWSROOM_ENABLED == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: newsroom-intake
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix newsroom --ignore-scripts --no-audit --no-fund
+      - name: Restore recent duplicate keys
+        uses: actions/cache/restore@v6
+        with:
+          path: newsroom/state/seen.json
+          key: newsroom-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: newsroom-seen-v1-
+      - name: Collect and rank candidates
+        env:
+          NEWSROOM_SOURCES: ${{ secrets.NEWSROOM_SOURCES }}
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+        run: node newsroom/run.mjs collect
+      - name: Upload encrypted review
+        uses: actions/upload-artifact@v7
+        with:
+          name: newsroom-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: newsroom/state/review.enc
+          if-no-files-found: error
+          retention-days: 3
+      - name: Save recent duplicate keys
+        uses: actions/cache/save@v6
+        with:
+          path: newsroom/state/seen.json
+          key: newsroom-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
