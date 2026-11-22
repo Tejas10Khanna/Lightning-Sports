@@ -153,7 +153,12 @@ export class EditorialReview {
       return null;
     });
     if (reservation) return Response.json({ revision, status: reservation.status });
-    const messageId = await deliver(this.env, revision, packet, factCheckPassed);
+    let messageId;
+    try {
+      messageId = await deliver(this.env, revision, packet, factCheckPassed);
+    } catch {
+      return Response.json({ reason: 'telegram-delivery-failed' }, { status: 503 });
+    }
     const acceptedAt = Date.now();
     await this.storage.transaction(async (tx) => {
       const review = await tx.get('review');
@@ -220,6 +225,15 @@ export default {
           packet = await readJson(request, 56_000);
         }
         if (!validPacket(packet)) return new Response(null, { status: 422 });
+        if (path === '/staging-reviews') {
+          if (!/^\d+:[A-Za-z0-9_-]+$/.test(env.TELEGRAM_BOT_TOKEN ?? '')) {
+            return Response.json({ reason: 'bot-token-missing-or-malformed' }, { status: 503 });
+          }
+          if (typeof env.TELEGRAM_CHAT_ID !== 'string' || !/^\d+$/.test(env.TELEGRAM_CHAT_ID) ||
+              env.TELEGRAM_EDITOR_ID !== env.TELEGRAM_CHAT_ID) {
+            return Response.json({ reason: 'private-chat-bindings-invalid' }, { status: 503 });
+          }
+        }
         const digest = await crypto.subtle.digest('SHA-256', encoder.encode(JSON.stringify(packet)));
         const revision = Array.from(new Uint8Array(digest).subarray(0, 16),
           (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -250,7 +264,7 @@ export default {
       }
       return new Response(null, { status: 404 });
     } catch {
-      return new Response('Newsroom request failed.', { status: 503 });
+      return Response.json({ reason: 'worker-request-failed' }, { status: 503 });
     }
   },
 };

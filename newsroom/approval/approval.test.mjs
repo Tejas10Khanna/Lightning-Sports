@@ -34,7 +34,7 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   const env = {
     NEWSROOM_INTAKE_TOKEN: 'intake-token',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-token',
-    TELEGRAM_BOT_TOKEN: 'mocked-bot',
+    TELEGRAM_BOT_TOKEN: '1234:mocked-bot',
     TELEGRAM_EDITOR_ID: '42',
     TELEGRAM_CHAT_ID: '42',
   };
@@ -54,7 +54,7 @@ test('a trusted submission sends a protected attachment and binds decisions to t
     },
   };
   t.mock.method(globalThis, 'fetch', async (url, options) => {
-    assert.match(url, /^https:\/\/api\.telegram\.org\/botmocked-bot\//);
+    assert.match(url, /^https:\/\/api\.telegram\.org\/bot1234:mocked-bot\//);
     if (url.endsWith('/sendDocument')) {
       deliveries.push(options.body);
       return Response.json({ ok: true, result: { message_id: 11 } });
@@ -114,6 +114,11 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   });
   assert.equal((await startStaging()).status, 404);
   env.NEWSROOM_STAGING_ENABLED = 'true';
+  env.TELEGRAM_CHAT_ID = '43';
+  const badBindings = await startStaging();
+  assert.equal(badBindings.status, 503);
+  assert.deepEqual(await badBindings.json(), { reason: 'private-chat-bindings-invalid' });
+  env.TELEGRAM_CHAT_ID = '42';
   env.NEWSROOM_PUBLISH_ENABLED = 'true';
   env.NEWSROOM_GITHUB_TOKEN = 'must-not-be-used';
   const staged = await startStaging();
