@@ -17,10 +17,10 @@ const answer = {
   headline: 'The final turned in the middle overs',
   dek: 'Three wickets changed the shape of a promising start.',
   paragraphs: [
-    { kind: 'reporting', text: 'The batting side reached 50 without loss in six overs.', evidenceIds: ['E1'] },
-    { kind: 'analysis', text: 'Three wickets through spin suggest the chase lost its foundation in the middle overs.', evidenceIds: ['E1', 'E2'] },
-    { kind: 'counterargument', text: 'Four overs alone give us little basis for a claim about either side’s long-term strategy.', evidenceIds: ['E2'] },
-    { kind: 'analysis', text: 'The change is an argument for examining the transition out of the powerplay.', evidenceIds: ['E1', 'E2'] },
+    { kind: 'reporting', text: 'The batting side reached 50 without loss in six overs.', primaryEvidenceId: 'E1', evidenceIds: [] },
+    { kind: 'analysis', text: 'Three wickets through spin suggest the chase lost its foundation in the middle overs.', primaryEvidenceId: 'E1', evidenceIds: ['E2'] },
+    { kind: 'counterargument', text: 'Four overs alone give us little basis for a claim about either side’s long-term strategy.', primaryEvidenceId: 'E2', evidenceIds: [] },
+    { kind: 'analysis', text: 'The change is an argument for examining the transition out of the powerplay.', primaryEvidenceId: 'E1', evidenceIds: ['E2'] },
   ],
   gaps: [],
 };
@@ -35,6 +35,7 @@ test('routes to sport-specific editorial instructions and retains source URLs lo
   });
   assert.equal(cricket.status, 'needs-human-verification');
   assert.equal(cricket.aiAssisted, true);
+  assert.deepEqual(cricket.paragraphs[0].evidenceIds, ['E1']);
   assert.equal(cricket.author, 'Lightning Sports Desk');
   assert.equal(cricket.evidence[0].url, 'https://cup.example/scorecard');
   const football = readBrief(JSON.stringify({ ...briefInput, sport: 'Football' }));
