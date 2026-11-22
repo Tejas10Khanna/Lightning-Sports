@@ -76,7 +76,7 @@ async function botRequest(env, method, body) {
   let response;
   try {
     response = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/' + method, {
-      method: 'POST', body, signal: AbortSignal.timeout(12_000), redirect: 'error',
+      method: 'POST', body, signal: AbortSignal.timeout(12_000), redirect: 'manual',
     });
   } catch {
     throw new Error('telegram-connection-failed');

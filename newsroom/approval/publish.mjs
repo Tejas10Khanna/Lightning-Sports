@@ -65,7 +65,7 @@ export async function commitArticle(article, token, request = fetch) {
   };
   async function existing() {
     const response = await request(url + '?ref=main', {
-      headers, redirect: 'error', signal: AbortSignal.timeout(15_000),
+      headers, redirect: 'manual', signal: AbortSignal.timeout(15_000),
     });
     if (response.status === 404) {
       await response.body?.cancel();
@@ -86,7 +86,7 @@ export async function commitArticle(article, token, request = fetch) {
   const prior = await existing();
   if (prior) return prior;
   const response = await request(url, {
-    method: 'PUT', headers, redirect: 'error', signal: AbortSignal.timeout(15_000),
+    method: 'PUT', headers, redirect: 'manual', signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({ message: 'Publish Lightning Sports editorial', content, branch: 'main' }),
   });
   if (response.status === 201) {

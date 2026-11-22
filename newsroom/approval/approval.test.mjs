@@ -55,6 +55,7 @@ test('a trusted submission sends a protected attachment and binds decisions to t
     },
   };
   t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(options.redirect, 'manual');
     assert.match(url, /^https:\/\/api\.telegram\.org\/bot1234:mocked-bot\//);
     if (url.endsWith('/sendDocument')) {
       if (telegramFailure) {
