@@ -104,12 +104,22 @@ Use a dedicated Telegram bot, start a private chat with it, and configure the
 Worker using the values below. Store tokens through Cloudflare's secret
 settings and keep them out of source code, logs, and chat.
 
+The setup helper can find the private editor and chat IDs before the webhook
+is active. Run `node newsroom/approval/telegram-setup.mjs discover` in a private
+terminal with `TELEGRAM_BOT_TOKEN` and `TELEGRAM_EXPECTED_BOT` in the process
+environment. The expected bot value is its public username. If the pending
+update has expired, send `/start` again. Keep the IDs in your configuration.
+
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and `NEWSROOM_INTAKE_TOKEN`
   are Worker secrets.
 - `TELEGRAM_CHAT_ID` and `TELEGRAM_EDITOR_ID` identify the authorized private
   chat and editor. Keep the values as strings in the Worker environment.
 - Register the Telegram webhook at the Worker URL ending in `/telegram` with
-  the same webhook secret. Enable only `callback_query` updates.
+  the same webhook secret. Set `NEWSROOM_APPROVAL_URL` to the Worker base URL
+  and supply `TELEGRAM_WEBHOOK_SECRET` in the same private environment. Run
+  `node newsroom/approval/telegram-setup.mjs connect`. The helper registers
+  only `callback_query` updates and checks Telegram's confirmed URL. It
+  refuses to replace a webhook pointing to another destination.
 - In GitHub Actions, set `NEWSROOM_APPROVAL_URL` to the Worker base URL and
   add the same `NEWSROOM_INTAKE_TOKEN` as an Actions secret. Without the URL,
   the draft workflow only uploads the encrypted review.
