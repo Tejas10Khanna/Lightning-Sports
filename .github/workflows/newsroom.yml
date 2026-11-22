@@ -36,6 +36,8 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm test
+      - name: Bundle the Cloudflare review service without deploying
+        run: npx --yes wrangler@4.166.0 deploy --dry-run --config approval/wrangler.toml
 
   collect:
     if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || (github.event_name == 'schedule' && vars.NEWSROOM_ENABLED == 'true'))
@@ -103,3 +105,10 @@ jobs:
           path: newsroom/state/draft.enc
           if-no-files-found: error
           retention-days: 3
+      - name: Submit packet to Telegram review
+        if: vars.NEWSROOM_APPROVAL_URL != ''
+        env:
+          NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
+          NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+        run: node newsroom/run.mjs send-for-review newsroom/state/draft.enc

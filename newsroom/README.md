@@ -84,17 +84,61 @@ example shows the required fields.
 
 Set `NEWSROOM_GEMINI_API_KEY` as a separate Actions secret and reuse
 `NEWSROOM_REPORT_KEY`. On `main`, choose **draft** in **Newsroom intake**.
-Each dispatch requests one draft from Gemini 3.1 Flash-Lite and uploads
+Each dispatch requests one draft from Gemini 3.1 Flash-Lite, then checks that
+draft with a separate model call. It uploads
 `draft.enc` for three days. Use the same decrypt command with `draft.enc`.
 Eligibility for the Gemini free tier depends on the associated API project.
 
 The Cricket and Football profiles require a thesis, reporting, analysis, and a
 counterargument, with an evidence reference on each paragraph. The private
 packet includes an AI-assistance flag and the Lightning Sports Desk byline.
-Check every claim, the headline, and the counterargument against the source
-before approval. Reference validation only confirms that cited notes exist.
-A brief that lacks enough evidence can produce a hold packet with the gaps
-listed. Drafting runs on demand and has no publishing step.
+The fact check compares the headline, dek, and every paragraph against the
+supplied notes. Missing support, contradictions, and sensitive material hold
+the draft for editorial review. Open the linked sources and independently
+verify the claims and interpretation before approval. Drafting runs on demand.
+
+## Telegram staging
+
+The review service is a Cloudflare Worker with SQLite-backed Durable Objects.
+Use a dedicated Telegram bot, start a private chat with it, and configure the
+Worker using the values below. Store tokens through Cloudflare's secret
+settings and keep them out of source code, logs, and chat.
+
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and `NEWSROOM_INTAKE_TOKEN`
+  are Worker secrets.
+- `TELEGRAM_CHAT_ID` and `TELEGRAM_EDITOR_ID` identify the authorized private
+  chat and editor. Keep the values as strings in the Worker environment.
+- Register the Telegram webhook at the Worker URL ending in `/telegram` with
+  the same webhook secret. Enable only `callback_query` updates.
+- In GitHub Actions, set `NEWSROOM_APPROVAL_URL` to the Worker base URL and
+  add the same `NEWSROOM_INTAKE_TOKEN` as an Actions secret. Without the URL,
+  the draft workflow only uploads the encrypted review.
+
+Bundle locally for a configuration check with
+`npx --yes wrangler@4.166.0 deploy --dry-run --config newsroom/approval/wrangler.toml`.
+
+The bot sends the article and source links as a protected attachment. Approve
+records the editor's sign-off. Edit closes that revision and requests a new
+draft. Reject closes the review. The five-minute window starts after Telegram
+confirms delivery. Unanswered reviews move to manual review, and drafts with
+fact-check issues offer Edit and Reject.
+
+## GitHub publishing
+
+Keep `NEWSROOM_PUBLISH_ENABLED` unset during staging. Test all three buttons
+and a full timeout, then review a draft and confirm that the article contract
+from PR #1 is on `main`. Only after the supervised test should you add a
+repository-scoped GitHub publisher token with Contents write permission as
+`NEWSROOM_GITHUB_TOKEN` and explicitly turn publishing on in the Worker.
+Check the production branch protection and Vercel deployment permissions
+for the publishing identity first.
+
+With publishing enabled, an explicit, eligible approval creates one Markdown
+file under `src/content/posts/` and checks its public URL. The publisher never
+overwrites an existing file. The Worker checks the live URL for up to 15
+minutes after the commit. GitHub writes and live-site verification require a
+supervised real run. Timeout publication requires an independent evidence
+and rights gate and is disabled in this pilot.
 
 ## Test
 
