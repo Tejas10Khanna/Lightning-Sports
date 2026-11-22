@@ -6,6 +6,12 @@ on:
       - 'newsroom/**'
       - '.github/workflows/newsroom.yml'
   workflow_dispatch:
+    inputs:
+      stage:
+        description: Newsroom stage to run
+        type: choice
+        default: intake
+        options: [intake, draft]
   schedule:
     - cron: '17 * * * *'
 
@@ -32,7 +38,7 @@ jobs:
       - run: npm test
 
   collect:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.NEWSROOM_ENABLED == 'true'))
+    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || (github.event_name == 'schedule' && vars.NEWSROOM_ENABLED == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -70,3 +76,30 @@ jobs:
         with:
           path: newsroom/state/seen.json
           key: newsroom-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+  draft:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix newsroom --ignore-scripts --no-audit --no-fund
+      - name: Draft an editorial from the supplied brief
+        env:
+          NEWSROOM_WRITER_BRIEF: ${{ secrets.NEWSROOM_WRITER_BRIEF }}
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+          NEWSROOM_GEMINI_API_KEY: ${{ secrets.NEWSROOM_GEMINI_API_KEY }}
+        run: node newsroom/run.mjs draft
+      - name: Upload encrypted editorial packet
+        uses: actions/upload-artifact@v7
+        with:
+          name: newsroom-draft-${{ github.run_id }}-${{ github.run_attempt }}
+          path: newsroom/state/draft.enc
+          if-no-files-found: error
+          retention-days: 3

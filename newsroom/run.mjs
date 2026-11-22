@@ -1,5 +1,6 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { geminiWriter, readBrief, writeDraft } from './draft.mjs';
 import { readSourceConfig } from './feeds.mjs';
 import { decryptReport, encryptReport, readReportKey } from './report.mjs';
 import { buildReview } from './review.mjs';
@@ -41,15 +42,22 @@ try {
   const key = readReportKey(process.env.NEWSROOM_REPORT_KEY);
   if (command === 'collect') {
     await collect(key, process.env);
+  } else if (command === 'draft') {
+    const brief = readBrief(process.env.NEWSROOM_WRITER_BRIEF);
+    const packet = await writeDraft(brief, geminiWriter(process.env.NEWSROOM_GEMINI_API_KEY));
+    const path = process.env.NEWSROOM_REPORT_FILE || 'newsroom/state/draft.enc';
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, encryptReport(packet, key), { flag: 'wx', mode: 0o600 });
+    console.log('Editorial packet saved with status %s.', packet.status);
   } else if (command === 'decrypt' && input && output) {
     const plaintext = decryptReport(await readFile(input), key);
     await mkdir(dirname(output), { recursive: true });
     await writeFile(output, plaintext, { flag: 'wx', mode: 0o600 });
   } else {
-    throw new Error('Use collect or decrypt <report.enc> <output.json>.');
+    throw new Error('Use collect, draft, or decrypt <report.enc> <output.json>.');
   }
 } catch (error) {
-  const safe = /^(NEWSROOM_REPORT_KEY|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect)/;
+  const safe = /^(NEWSROOM_(REPORT_KEY|GEMINI_API_KEY)|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect|Provide a valid NEWSROOM_WRITER_BRIEF|Writer )/;
   console.error(safe.test(error.message) ? error.message : 'Newsroom command failed. Check configuration and file access.');
   process.exitCode = 1;
 }
