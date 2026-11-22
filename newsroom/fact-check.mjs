@@ -2,11 +2,13 @@ const verdicts = ['supported', 'unsupported', 'contradicted', 'unclear'];
 const risks = ['routine', 'sensitive', 'uncertain'];
 const schema = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     checks: {
       type: 'array',
       items: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           unitId: { type: 'string' },
           verdict: { type: 'string', enum: verdicts },
