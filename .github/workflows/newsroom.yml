@@ -11,7 +11,7 @@ on:
         description: Newsroom stage to run
         type: choice
         default: intake
-        options: [intake, draft, telegram-test]
+        options: [intake, draft, groq-test, telegram-test]
       telegram_scenario:
         description: Expected outcome of the Telegram staging test
         type: choice
@@ -101,7 +101,7 @@ jobs:
         env:
           NEWSROOM_WRITER_BRIEF: ${{ secrets.NEWSROOM_WRITER_BRIEF }}
           NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
-          NEWSROOM_GEMINI_API_KEY: ${{ secrets.NEWSROOM_GEMINI_API_KEY }}
+          NEWSROOM_GROQ_API_KEY: ${{ secrets.NEWSROOM_GROQ_API_KEY }}
         run: node newsroom/run.mjs draft
       - name: Upload encrypted editorial packet
         uses: actions/upload-artifact@v7
@@ -117,6 +117,42 @@ jobs:
           NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
           NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
         run: node newsroom/run.mjs send-for-review newsroom/state/draft.enc
+
+  groq-test:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'groq-test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Draft and check a fictional football editorial
+        env:
+          NEWSROOM_GROQ_API_KEY: ${{ secrets.NEWSROOM_GROQ_API_KEY }}
+        run: |
+          node --input-type=module <<'JS'
+          import { groqWriter, readBrief, writeDraft } from './newsroom/draft.mjs';
+          import { checkDraft } from './newsroom/fact-check.mjs';
+          const brief = readBrief(JSON.stringify({
+            sport: 'Football',
+            topic: 'What did Alder FC gain by introducing a second forward when trailing?',
+            modelUseApproved: true,
+            evidence: [
+              { fact: 'Alder FC trailed 1–0 at half-time and brought on a second forward in the 60th minute.', url: 'https://example.test/report' },
+              { fact: 'The substitute received the ball inside the area and assisted the 73rd-minute equalizer. The match ended 1–1.', url: 'https://example.test/report' },
+              { fact: 'Alder recorded two shots before the substitution and four afterwards. Their opponent also had two late shots on target.', url: 'https://example.test/stats' },
+            ],
+          }));
+          const generate = groqWriter(process.env.NEWSROOM_GROQ_API_KEY);
+          const draft = await writeDraft(brief, generate);
+          if (draft.status !== 'needs-human-verification') throw new Error('The fictional brief did not produce a draft.');
+          const checked = await checkDraft(draft, generate);
+          console.log('Groq draft and evidence check completed. Review status: %s.', checked.status);
+          JS
 
   telegram-test:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'telegram-test'
