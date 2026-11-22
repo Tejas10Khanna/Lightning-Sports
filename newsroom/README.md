@@ -104,6 +104,23 @@ Use a dedicated Telegram bot, start a private chat with it, and configure the
 Worker using the values below. Store tokens through Cloudflare's secret
 settings and keep them out of source code, logs, and chat.
 
+For the first deployment, use **Workers & Pages → Create application →
+GitHub**. Grant repository access to `Tejas10Khanna/Lightning-Sports` and
+configure the Worker before deploying.
+
+| Cloudflare setting | Value |
+| --- | --- |
+| Worker name | `lightning-sports-editorial-review` |
+| Branch | `codex/newsroom-supervised-publishing` |
+| Root directory | `newsroom/approval` |
+| Build command | Leave blank |
+| Deploy command | `npx --yes wrangler@4.166.0 deploy` |
+
+Use the assigned `workers.dev` URL for staging. Wrangler preserves variables
+configured in the Worker dashboard on future deploys. The Cloudflare build
+environment and the Worker runtime settings have separate uses. Add Telegram
+secrets to the Worker runtime settings.
+
 The setup helper can find the private editor and chat IDs before the webhook
 is active. Run `node newsroom/approval/telegram-setup.mjs discover` in a private
 terminal with `TELEGRAM_BOT_TOKEN` and `TELEGRAM_EXPECTED_BOT` in the process
