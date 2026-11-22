@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { sendForReview } from './approval/submit.mjs';
-import { geminiWriter, readBrief, writeDraft } from './draft.mjs';
+import { groqWriter, readBrief, writeDraft } from './draft.mjs';
 import { checkDraft } from './fact-check.mjs';
 import { readSourceConfig } from './feeds.mjs';
 import { decryptReport, encryptReport, readReportKey } from './report.mjs';
@@ -46,7 +46,7 @@ try {
     await collect(key, process.env);
   } else if (command === 'draft') {
     const brief = readBrief(process.env.NEWSROOM_WRITER_BRIEF);
-    const generate = geminiWriter(process.env.NEWSROOM_GEMINI_API_KEY);
+    const generate = groqWriter(process.env.NEWSROOM_GROQ_API_KEY);
     const packet = await checkDraft(await writeDraft(brief, generate), generate);
     const path = process.env.NEWSROOM_REPORT_FILE || 'newsroom/state/draft.enc';
     await mkdir(dirname(path), { recursive: true });
@@ -66,7 +66,7 @@ try {
     throw new Error('Use collect, draft, send-for-review <draft.enc>, or decrypt <report.enc> <output.json>.');
   }
 } catch (error) {
-  const safe = /^(NEWSROOM_(REPORT_KEY|GEMINI_API_KEY)|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect|Provide a valid NEWSROOM_WRITER_BRIEF|Writer |Fact check |Telegram review service )/;
+  const safe = /^(NEWSROOM_(REPORT_KEY|GROQ_API_KEY)|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect|Provide a valid NEWSROOM_WRITER_BRIEF|Writer |Fact check |Telegram review service )/;
   console.error(safe.test(error.message) ? error.message : 'Newsroom command failed. Check configuration and file access.');
   process.exitCode = 1;
 }
