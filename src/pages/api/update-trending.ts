@@ -18,7 +18,7 @@ const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY; // set in Vercel project 
 export const GET: APIRoute = async () => {
   try {
     const posts = await getCollection('posts');
-    const categories = [...new Set(posts.map((p) => p.data.category))];
+    const categories = [...new Set(posts.flatMap((p) => p.data.category))];
 
     const prompt = `Today's date is ${new Date().toISOString().slice(0, 10)}.
 Here is a fixed list of sports categories: ${categories.join(', ')}.

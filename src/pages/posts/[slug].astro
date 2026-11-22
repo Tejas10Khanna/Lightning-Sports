@@ -95,6 +95,7 @@ const readMin = Math.max(1, Math.round(words / 200));
   .byline-info { display: flex; flex-direction: column; }
   .byline-info .name { font-weight: 600; font-size: 14px; color: var(--t-ink); }
   .byline-info .meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--t-ink-muted); margin-top: 3px; }
+  .byline-info .disclosure { font-size: 13px; color: var(--t-ink-muted); margin-top: 4px; }
   .byline-stats { margin-left: auto; display: flex; gap: 20px; font-family: var(--font-mono); font-size: 11.5px; color: var(--t-ink-muted); }
   .byline-stats b { color: var(--t-ink); font-weight: 500; }
 
@@ -121,6 +122,12 @@ const readMin = Math.max(1, Math.round(words / 200));
   }
   .prose :global(a) { color: var(--t-accent); text-decoration: underline; }
   .prose :global(img) { max-width: 100%; border-radius: 12px; margin: 30px auto; }
+  .featured-quote {
+    border-inline-start: 3px solid var(--t-accent);
+    margin: 0 0 26px;
+    padding-inline-start: 18px;
+    font-style: italic;
+  }
 </style>
 
 <div class="breadcrumb">
@@ -143,6 +150,7 @@ const readMin = Math.max(1, Math.round(words / 200));
       <div class="byline-info">
         <span class="name">{post.data.author}</span>
         <span class="meta">{fmt(post.data.date)} · {readMin} min read</span>
+        {post.data.aiAssisted && <span class="disclosure">AI-assisted article</span>}
       </div>
       <div class="byline-stats">
         <span><b>{views.toLocaleString()}</b> views</span>
@@ -159,7 +167,10 @@ const readMin = Math.max(1, Math.round(words / 200));
 )}
 
 <section class="article-wrap">
-  <article class="prose"><Content /></article>
+  <article class="prose">
+    {post.data.featuredQuote && <blockquote class="featured-quote">{post.data.featuredQuote}</blockquote>}
+    <Content />
+  </article>
   <EngagementBar postId={post.id} initialLikes={likes} />
 </section>
 </BaseLayout>

@@ -7,23 +7,33 @@ const posts = defineCollection({
     base: "./src/content/posts"
   }),
 
-  // THIS IS THE BLUEPRINT: We added 'dek' and 'tags' here
   schema: z.object({
     title: z.string(),
     date: z.coerce.date(),
     categories: z.array(z.string()).default(['uncategorized']),
-    author: z.string().default('Tejas Khanna'),
-    mainSport: z.string().optional(), // <-- THE MANUAL OVERRIDE SWITCH
-    dek: z.string().optional(),       // <-- ADDED: Allows subtitles/summaries
-    tags: z.array(z.string()).optional(), // <-- ADDED: Allows specific tags
+    author: z.string().trim().optional(),
+    aiAssisted: z.boolean().default(false),
+    mainSport: z.union([z.string(), z.array(z.string())]).optional(),
+    rawTags: z.array(z.string()).optional(),
+    featuredQuote: z.string().trim().optional(),
+    dek: z.string().trim().optional(),
+    tags: z.array(z.string()).optional(),
+  }).refine((data) => !data.aiAssisted || Boolean(data.author), {
+    path: ['author'],
+    message: 'AI-assisted articles require an explicit byline.',
   }).transform((data) => {
-    
-    // 1. If you manually set a category in the file, USE IT IMMEDIATELY AND SKIP EVERYTHING ELSE.
-    if (data.mainSport) {
+    const article = {
+      ...data,
+      author: data.author || 'Tejas Khanna',
+      rawTags: data.rawTags ?? data.categories,
+    };
+    const sports = [data.mainSport ?? []].flat();
+    const selectedSports = [...new Set(sports.map((sport) => sport.trim()).filter(Boolean))];
+
+    if (selectedSports.length > 0) {
       return {
-        ...data,
-        category: data.mainSport,
-        rawTags: data.categories
+        ...article,
+        category: selectedSports.length === 1 ? selectedSports[0] : selectedSports,
       };
     }
 
@@ -51,9 +61,8 @@ const posts = defineCollection({
     }
 
     return {
-      ...data,
+      ...article,
       category: computedSport,
-      rawTags: data.categories
     };
   }),
 });
