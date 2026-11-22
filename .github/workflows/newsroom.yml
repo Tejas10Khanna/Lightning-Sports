@@ -11,7 +11,12 @@ on:
         description: Newsroom stage to run
         type: choice
         default: intake
-        options: [intake, draft]
+        options: [intake, draft, telegram-test]
+      telegram_scenario:
+        description: Expected outcome of the Telegram staging test
+        type: choice
+        default: approve
+        options: [approve, edit, reject, timeout]
   schedule:
     - cron: '17 * * * *'
 
@@ -112,3 +117,25 @@ jobs:
           NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
           NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
         run: node newsroom/run.mjs send-for-review newsroom/state/draft.enc
+
+  telegram-test:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'telegram-test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: newsroom-telegram-test
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Send a fictional draft and verify the selected outcome
+        env:
+          NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
+          NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
+          NEWSROOM_STAGING_SCENARIO: ${{ inputs.telegram_scenario }}
+        run: node newsroom/approval/staging-cli.mjs

@@ -95,8 +95,8 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   assert.equal((await post('intake-token')).status, 200);
   assert.equal(deliveries.length, 1);
 
-  const callback = (token, editor, message, action) => call('/telegram', 'x-telegram-bot-api-secret-token', token, {
-    callback_query: { id: 'click', data: action + ':' + revision, from: { id: editor },
+  const callback = (token, editor, message, action, target = revision) => call('/telegram', 'x-telegram-bot-api-secret-token', token, {
+    callback_query: { id: 'click', data: action + ':' + target, from: { id: editor },
       message: { chat: { id: 42 }, message_id: message } },
   });
   assert.equal((await callback('wrong', 42, 11, 'a')).status, 403);
@@ -108,6 +108,31 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   assert.equal(responses.at(-1), 'Approval recorded.');
   await callback('webhook-token', 42, 11, 'r');
   assert.equal((await (await post('intake-token')).json()).status, 'approved');
+
+  const startStaging = () => call('/staging-reviews', 'x-newsroom-intake-token', 'intake-token', {
+    runKey: '123-1', scenario: 'approve',
+  });
+  assert.equal((await startStaging()).status, 404);
+  env.NEWSROOM_STAGING_ENABLED = 'true';
+  env.NEWSROOM_PUBLISH_ENABLED = 'true';
+  env.NEWSROOM_GITHUB_TOKEN = 'must-not-be-used';
+  const staged = await startStaging();
+  assert.equal(staged.status, 201);
+  const { revision: testRevision } = await staged.json();
+  assert.match(deliveries.at(-1).get('caption'), /STAGING ONLY.*approve/);
+  const status = (token) => worker.fetch(new Request('https://newsroom.example/reviews/' + testRevision, {
+    headers: { 'x-newsroom-intake-token': token },
+  }), env);
+  assert.equal((await status('wrong')).status, 403);
+  const alarmsBeforeApproval = scheduled.length;
+  assert.equal((await callback('webhook-token', 42, 11, 'a', testRevision)).status, 204);
+  assert.equal(scheduled.length, alarmsBeforeApproval);
+  await instances.get(testRevision).alarm();
+  const stagedStatus = await (await status('intake-token')).json();
+  assert.equal(stagedStatus.status, 'approved');
+  assert.equal(stagedStatus.testOnly, true);
+  assert.equal(stagedStatus.deadline - stagedStatus.deliveredAt, 300_000);
+  assert.equal(stagedStatus.article, undefined);
 });
 
 test('the submission client skips insufficient evidence and sends credentials only as a header', async () => {

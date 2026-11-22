@@ -123,6 +123,21 @@ draft. Reject closes the review. The five-minute window starts after Telegram
 confirms delivery. Unanswered reviews move to manual review, and drafts with
 fact-check issues offer Edit and Reject.
 
+### Run the live Telegram checks
+
+After deploying the Worker and registering the webhook, set the Worker
+variable `NEWSROOM_STAGING_ENABLED` to the string `true`. In **Newsroom intake**
+on `main`, choose **telegram-test** and one of **approve**, **edit**, **reject**,
+or **timeout**. The bot sends a clearly marked fictional draft for each run.
+Follow the instruction in its caption. For the timeout test, leave the buttons
+untouched for five minutes.
+
+The workflow verifies that the Worker recorded the selected outcome and
+measured the five-minute window from confirmed delivery. These tests use the
+Worker URL and intake token. They require neither feed access nor a Gemini
+key. The Worker excludes fictional drafts from publishing even if publishing
+is enabled. Clear `NEWSROOM_STAGING_ENABLED` after the checks.
+
 ## GitHub publishing
 
 Keep `NEWSROOM_PUBLISH_ENABLED` unset during staging. Test all three buttons

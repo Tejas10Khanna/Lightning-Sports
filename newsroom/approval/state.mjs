@@ -23,5 +23,5 @@ export function decide(review, { action, messageId, now }) {
 
 export function expireReview(review, now) {
   if (review.status !== 'awaiting-decision' || now < review.deadline) return review;
-  return { ...review, status: 'manual-review' };
+  return { ...review, status: 'manual-review', expiredAt: now };
 }

@@ -1,5 +1,6 @@
 import { attachDelivery, decide, expireReview } from './state.mjs';
 import { checkLiveArticle, commitArticle, prepareArticle } from './publish.mjs';
+import { stagingPacket } from './staging-packet.mjs';
 
 const encoder = new TextEncoder();
 const controls = { a: 'approve', e: 'edit', r: 'reject' };
@@ -44,6 +45,7 @@ async function readJson(request, limit) {
 
 function validPacket(packet) {
   return ['Cricket', 'Football'].includes(packet?.sport) &&
+    (packet.testOnly === undefined || typeof packet.testOnly === 'boolean') &&
     ['needs-human-verification', 'held-for-editorial-review'].includes(packet.status) &&
     typeof packet.headline === 'string' && packet.headline.length > 0 && packet.headline.length <= 160 &&
     typeof packet.dek === 'string' && packet.dek.length <= 300 &&
@@ -80,8 +82,9 @@ async function deliver(env, revision, packet, factCheckPassed) {
   form.set('chat_id', env.TELEGRAM_CHAT_ID);
   form.set('protect_content', 'true');
   form.set('document', new Blob([reviewDocument(packet)], { type: 'text/plain' }), 'editorial-draft.txt');
-  form.set('caption', packet.sport + ' editorial review\n' + packet.headline +
-    (factCheckPassed ? '\nConfirm facts, citations, and rights before approving.' : '\nHeld for editorial review.'));
+  const directions = packet.testOnly ? packet.dek : factCheckPassed
+    ? 'Confirm facts, citations, and rights before approving.' : 'Held for editorial review.';
+  form.set('caption', packet.sport + ' editorial review\n' + packet.headline + '\n' + directions);
   const buttons = [
     { text: 'Edit', callback_data: 'e:' + revision },
     { text: 'Reject', callback_data: 'r:' + revision },
@@ -112,6 +115,12 @@ export class EditorialReview {
   async fetch(request) {
     const path = new URL(request.url).pathname;
     if (path === '/submit') return this.submit(await request.json());
+    if (path === '/status') {
+      const review = await this.storage.transaction((tx) => tx.get('review'));
+      if (!review) return new Response(null, { status: 404 });
+      const { status, testOnly, deliveredAt, deadline, decidedAt, expiredAt } = review;
+      return Response.json({ status, testOnly, deliveredAt, deadline, decidedAt, expiredAt });
+    }
     if (path === '/decision') {
       const input = await request.json();
       const status = await this.storage.transaction(async (tx) => {
@@ -120,7 +129,7 @@ export class EditorialReview {
         const updated = decide(original, { ...input, now: Date.now() });
         if (updated !== original) {
           await tx.put('review', updated);
-          if (updated.status === 'approved' && this.env.NEWSROOM_PUBLISH_ENABLED === 'true') {
+          if (updated.status === 'approved' && !updated.testOnly && this.env.NEWSROOM_PUBLISH_ENABLED === 'true') {
             await tx.setAlarm(Date.now());
           }
         }
@@ -134,11 +143,12 @@ export class EditorialReview {
   async submit({ revision, packet }) {
     const now = Date.now();
     const factCheckPassed = allChecksPassed(packet);
-    const article = factCheckPassed ? prepareArticle(packet, revision, now) : undefined;
+    const testOnly = packet.testOnly === true;
+    const article = factCheckPassed && !testOnly ? prepareArticle(packet, revision, now) : undefined;
     const reservation = await this.storage.transaction(async (tx) => {
       const original = await tx.get('review');
       if (original && (original.status !== 'delivering' || original.reservedAt > now - 30_000)) return original;
-      const review = { revision, status: 'delivering', reservedAt: now, factCheckPassed };
+      const review = { revision, status: 'delivering', reservedAt: now, factCheckPassed, testOnly };
       await tx.put('review', review);
       return null;
     });
@@ -163,7 +173,7 @@ export class EditorialReview {
       if (updated !== original) await tx.put('review', updated);
       return updated;
     });
-    if (review?.status === 'approved' && this.env.NEWSROOM_PUBLISH_ENABLED === 'true') {
+    if (review?.status === 'approved' && !review.testOnly && this.env.NEWSROOM_PUBLISH_ENABLED === 'true') {
       const result = await commitArticle(review.article, this.env.NEWSROOM_GITHUB_TOKEN);
       await this.storage.transaction(async (tx) => {
         await tx.put('review', { ...review, status: 'committed', result, checks: 0 });
@@ -187,14 +197,28 @@ function reviewStub(env, id) {
 
 export default {
   async fetch(request, env) {
-    if (request.method !== 'POST') return new Response(null, { status: 405 });
     const path = new URL(request.url).pathname;
     try {
-      if (path === '/reviews') {
+      const statusPath = /^\/reviews\/([0-9a-f]{32})$/.exec(path);
+      if (request.method === 'GET' && statusPath) {
         if (!await sameSecret(request.headers.get('x-newsroom-intake-token'), env.NEWSROOM_INTAKE_TOKEN)) {
           return new Response(null, { status: 403 });
         }
-        const packet = await readJson(request, 56_000);
+        return await reviewStub(env, statusPath[1]).fetch('https://review.internal/status');
+      }
+      if (request.method !== 'POST') return new Response(null, { status: 405 });
+      if (path === '/reviews' || path === '/staging-reviews') {
+        if (!await sameSecret(request.headers.get('x-newsroom-intake-token'), env.NEWSROOM_INTAKE_TOKEN)) {
+          return new Response(null, { status: 403 });
+        }
+        let packet;
+        if (path === '/staging-reviews') {
+          if (env.NEWSROOM_STAGING_ENABLED !== 'true') return new Response(null, { status: 404 });
+          const input = await readJson(request, 1024);
+          packet = stagingPacket(input?.runKey, input?.scenario);
+        } else {
+          packet = await readJson(request, 56_000);
+        }
         if (!validPacket(packet)) return new Response(null, { status: 422 });
         const digest = await crypto.subtle.digest('SHA-256', encoder.encode(JSON.stringify(packet)));
         const revision = Array.from(new Uint8Array(digest).subarray(0, 16),
