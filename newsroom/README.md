@@ -63,9 +63,7 @@ private packet. When all feeds fail, the run fails visibly.
 
 Prepare a brief from a selected lead. Check its sources and record two or more
 distinct facts in your own words. Include only material permitted for transfer
-to the model provider under your account terms. Google's unpaid service may
-use submitted material to improve its products. See the
-[Gemini API terms](https://aistudio.google.com/docs/terms#unpaid-services).
+to the model provider under your account terms. Review [Groq’s data controls](https://console.groq.com/docs/your-data) for retention settings.
 
 Save the brief as the Actions secret `NEWSROOM_WRITER_BRIEF`. This fictional
 example shows the required fields.
@@ -82,12 +80,12 @@ example shows the required fields.
 }
 ```
 
-Set `NEWSROOM_GEMINI_API_KEY` as a separate Actions secret and reuse
+Set `NEWSROOM_GROQ_API_KEY` as a separate Actions secret and reuse
 `NEWSROOM_REPORT_KEY`. On `main`, choose **draft** in **Newsroom intake**.
-Each dispatch requests one draft from Gemini 3.1 Flash-Lite, then checks that
+Each dispatch requests one draft from GPT-OSS 120B on Groq, then checks that
 draft with a separate model call. It uploads
 `draft.enc` for three days. Use the same decrypt command with `draft.enc`.
-Eligibility for the Gemini free tier depends on the associated API project.
+Check the Groq console for the API project’s current limits.
 
 The Cricket and Football profiles require a thesis, reporting, analysis, and a
 counterargument, with an evidence reference on each paragraph. The private
@@ -161,7 +159,7 @@ untouched for five minutes.
 
 The workflow verifies that the Worker recorded the selected outcome and
 measured the five-minute window from confirmed delivery. These tests use the
-Worker URL and intake token. They require neither feed access nor a Gemini
+Worker URL and intake token. They require neither feed access nor a Groq
 key. The Worker excludes fictional drafts from publishing even if publishing
 is enabled. Clear `NEWSROOM_STAGING_ENABLED` after the checks.
 

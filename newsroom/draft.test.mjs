@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { geminiWriter, readBrief, writeDraft } from './draft.mjs';
+import { groqWriter, readBrief, writeDraft } from './draft.mjs';
 
 const briefInput = {
   sport: 'Cricket',
@@ -58,21 +58,22 @@ test('rejects unapproved evidence and blocks drafts with unknown citations or mi
   assert.equal(hold.paragraphs, undefined);
 });
 
-test('Gemini request uses structured JSON and treats incomplete output as a failure', async () => {
+test('Groq request uses structured JSON and treats incomplete output as a failure', async () => {
   const request = async (url, options) => {
-    assert.equal(new URL(url).hostname, 'generativelanguage.googleapis.com');
+    assert.equal(new URL(url).hostname, 'api.groq.com');
     assert.ok(!url.includes('fake-test-key'));
-    assert.equal(options.headers['x-goog-api-key'], 'fake-test-key');
+    assert.equal(options.headers.authorization, 'Bearer fake-test-key');
     const body = JSON.parse(options.body);
-    assert.equal(body.generationConfig.responseMimeType, 'application/json');
-    assert.equal(body.generationConfig.responseJsonSchema.type, 'object');
+    assert.equal(body.model, 'openai/gpt-oss-120b');
+    assert.equal(body.response_format.json_schema.strict, true);
+    assert.equal(body.response_format.json_schema.schema.properties.paragraphs.items.additionalProperties, false);
     assert.equal(body.tools, undefined);
-    return Response.json({ candidates: [{
-      finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(answer) }] },
+    return Response.json({ choices: [{
+      finish_reason: 'stop', message: { content: JSON.stringify(answer) },
     }] });
   };
-  const draft = await writeDraft(brief, geminiWriter('fake-test-key', request));
+  const draft = await writeDraft(brief, groqWriter('fake-test-key', request));
   assert.equal(draft.headline, answer.headline);
-  const incomplete = async () => Response.json({ candidates: [{ finishReason: 'MAX_TOKENS' }] });
-  await assert.rejects(writeDraft(brief, geminiWriter('fake-test-key', incomplete)), /incomplete response/);
+  const incomplete = async () => Response.json({ choices: [{ finish_reason: 'length' }] });
+  await assert.rejects(writeDraft(brief, groqWriter('fake-test-key', incomplete)), /incomplete response/);
 });

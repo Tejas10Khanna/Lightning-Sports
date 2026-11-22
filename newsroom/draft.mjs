@@ -6,6 +6,7 @@ const profiles = {
 const paragraphKinds = ['reporting', 'analysis', 'counterargument'];
 const schema = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     decision: { type: 'string', enum: ['draft', 'hold'] },
     headline: { type: 'string' },
@@ -14,6 +15,7 @@ const schema = {
       type: 'array',
       items: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           kind: { type: 'string', enum: paragraphKinds },
           text: { type: 'string' },
@@ -122,22 +124,25 @@ export async function writeDraft(brief, generate) {
   return { ...packet, status: 'needs-human-verification', headline: headline.trim(), dek: dek.trim(), paragraphs: body, gaps };
 }
 
-export function geminiWriter(apiKey, request = fetch) {
-  if (!apiKey?.trim()) throw new Error('NEWSROOM_GEMINI_API_KEY is required for drafting.');
+export function groqWriter(apiKey, request = fetch) {
+  if (!apiKey?.trim()) throw new Error('NEWSROOM_GROQ_API_KEY is required for drafting.');
   return async ({ instruction, input, schema }) => {
-    const response = await request('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent', {
+    const response = await request('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       redirect: 'error',
       signal: AbortSignal.timeout(45_000),
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + apiKey.trim() },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: instruction }] },
-        contents: [{ role: 'user', parts: [{ text: input }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseJsonSchema: schema,
-          maxOutputTokens: 3500,
-          thinkingConfig: { thinkingLevel: 'minimal' },
+        model: 'openai/gpt-oss-120b',
+        messages: [
+          { role: 'system', content: instruction },
+          { role: 'user', content: input },
+        ],
+        max_completion_tokens: 3500,
+        reasoning_effort: 'low',
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'editorial_packet', strict: true, schema },
         },
       }),
     });
@@ -145,9 +150,9 @@ export function geminiWriter(apiKey, request = fetch) {
       await response.body?.cancel();
       throw new Error('Writer model request failed with HTTP ' + response.status + '.');
     }
-    const candidate = (await response.json()).candidates?.[0];
-    if (candidate?.finishReason !== 'STOP') throw new Error('Writer model returned an incomplete response.');
-    const json = candidate.content?.parts?.filter((part) => !part.thought).map((part) => part.text).join('');
+    const candidate = (await response.json()).choices?.[0];
+    if (candidate?.finish_reason !== 'stop') throw new Error('Writer model returned an incomplete response.');
+    const json = candidate.message?.content;
     try {
       return JSON.parse(json);
     } catch {
