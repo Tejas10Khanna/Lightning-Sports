@@ -1,0 +1,12 @@
+name = "lightning-sports-editorial-review"
+main = "worker.mjs"
+compatibility_date = "2026-11-01"
+keep_vars = true
+
+[[durable_objects.bindings]]
+name = "EDITORIAL_REVIEW"
+class_name = "EditorialReview"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["EditorialReview"]

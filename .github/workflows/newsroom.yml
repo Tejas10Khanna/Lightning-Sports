@@ -1,0 +1,141 @@
+name: Newsroom intake
+
+on:
+  pull_request:
+    paths:
+      - 'newsroom/**'
+      - '.github/workflows/newsroom.yml'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Newsroom stage to run
+        type: choice
+        default: intake
+        options: [intake, draft, telegram-test]
+      telegram_scenario:
+        description: Expected outcome of the Telegram staging test
+        type: choice
+        default: approve
+        options: [approve, edit, reject, timeout]
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: newsroom
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - name: Bundle the Cloudflare review service without deploying
+        run: npx --yes wrangler@4.166.0 deploy --dry-run --config approval/wrangler.toml
+
+  collect:
+    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || (github.event_name == 'schedule' && vars.NEWSROOM_ENABLED == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: newsroom-intake
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix newsroom --ignore-scripts --no-audit --no-fund
+      - name: Restore recent duplicate keys
+        uses: actions/cache/restore@v6
+        with:
+          path: newsroom/state/seen.json
+          key: newsroom-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: newsroom-seen-v1-
+      - name: Collect and rank candidates
+        env:
+          NEWSROOM_SOURCES: ${{ secrets.NEWSROOM_SOURCES }}
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+        run: node newsroom/run.mjs collect
+      - name: Upload encrypted review
+        uses: actions/upload-artifact@v7
+        with:
+          name: newsroom-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: newsroom/state/review.enc
+          if-no-files-found: error
+          retention-days: 3
+      - name: Save recent duplicate keys
+        uses: actions/cache/save@v6
+        with:
+          path: newsroom/state/seen.json
+          key: newsroom-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+  draft:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix newsroom --ignore-scripts --no-audit --no-fund
+      - name: Draft an editorial from the supplied brief
+        env:
+          NEWSROOM_WRITER_BRIEF: ${{ secrets.NEWSROOM_WRITER_BRIEF }}
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+          NEWSROOM_GEMINI_API_KEY: ${{ secrets.NEWSROOM_GEMINI_API_KEY }}
+        run: node newsroom/run.mjs draft
+      - name: Upload encrypted editorial packet
+        uses: actions/upload-artifact@v7
+        with:
+          name: newsroom-draft-${{ github.run_id }}-${{ github.run_attempt }}
+          path: newsroom/state/draft.enc
+          if-no-files-found: error
+          retention-days: 3
+      - name: Submit packet to Telegram review
+        if: vars.NEWSROOM_APPROVAL_URL != ''
+        env:
+          NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
+          NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+        run: node newsroom/run.mjs send-for-review newsroom/state/draft.enc
+
+  telegram-test:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'telegram-test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: newsroom-telegram-test
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Send a fictional draft and verify the selected outcome
+        env:
+          NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
+          NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
+          NEWSROOM_STAGING_SCENARIO: ${{ inputs.telegram_scenario }}
+        run: node newsroom/approval/staging-cli.mjs
