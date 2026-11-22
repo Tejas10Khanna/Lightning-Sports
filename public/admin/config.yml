@@ -30,6 +30,24 @@ collections:
       - label: "Publish Date"
         name: "date"
         widget: "datetime"
+
+      - label: "Subtitle"
+        name: "dek"
+        widget: "string"
+        required: false
+
+      - label: "Byline"
+        name: "author"
+        widget: "string"
+        required: false
+        hint: "Enter the credited name. This field is required for AI-assisted stories."
+
+      - label: "AI-assisted"
+        name: "aiAssisted"
+        widget: "boolean"
+        default: false
+        required: false
+        hint: "Adds an AI-assistance disclosure to the article."
         
       - label: "1. Primary Sport(s) or Multi-Sport Event(s)"
         name: "mainSport"
@@ -40,14 +58,14 @@ collections:
       - label: "2. Tournament or Edition (Deep Route)"
         name: "rawTags"
         widget: "list"
-        default: ["General Updates"]
-        hint: "Type the specific tournaments (e.g., 'T20 World Cup' and 'Paris 2024'). Hit Enter after each one."
+        required: false
+        hint: "Enter a tournament or edition, such as T20 World Cup or Paris 2024, and press Enter."
         
       - label: "Featured Pull-Quote"
         name: "featuredQuote"
         widget: "string"
         required: false
-        hint: "A short, punchy quote that will be visually highlighted in the middle of the story."
+        hint: "A short quote to highlight above the article body."
         
       - label: "Story Content"
         name: "body"
