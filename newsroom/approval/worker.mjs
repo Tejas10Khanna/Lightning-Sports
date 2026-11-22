@@ -3,6 +3,10 @@ import { checkLiveArticle, commitArticle, prepareArticle } from './publish.mjs';
 import { stagingPacket } from './staging-packet.mjs';
 
 const encoder = new TextEncoder();
+const deliveryReasons = new Set([
+  'telegram-token-rejected', 'telegram-chat-unavailable', 'telegram-bot-blocked',
+  'telegram-request-invalid', 'telegram-rate-limited', 'telegram-connection-failed',
+]);
 const controls = { a: 'approve', e: 'edit', r: 'reject' };
 const statusText = {
   approved: 'Approval recorded.',
@@ -69,11 +73,25 @@ function reviewDocument(packet) {
 }
 
 async function botRequest(env, method, body) {
-  const response = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/' + method, {
-    method: 'POST', body, signal: AbortSignal.timeout(12_000), redirect: 'error',
-  });
-  const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error('Telegram rejected the request.');
+  let response;
+  try {
+    response = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/' + method, {
+      method: 'POST', body, signal: AbortSignal.timeout(12_000), redirect: 'error',
+    });
+  } catch {
+    throw new Error('telegram-connection-failed');
+  }
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.ok) {
+    const description = typeof result?.description === 'string' ? result.description : '';
+    const status = result?.error_code ?? response.status;
+    if (status === 401 || status === 404) throw new Error('telegram-token-rejected');
+    if (/chat not found/i.test(description)) throw new Error('telegram-chat-unavailable');
+    if (status === 403 && result) throw new Error('telegram-bot-blocked');
+    if (status === 400 && result) throw new Error('telegram-request-invalid');
+    if (status === 429) throw new Error('telegram-rate-limited');
+    throw new Error('telegram-connection-failed');
+  }
   return result.result;
 }
 
@@ -156,8 +174,9 @@ export class EditorialReview {
     let messageId;
     try {
       messageId = await deliver(this.env, revision, packet, factCheckPassed);
-    } catch {
-      return Response.json({ reason: 'telegram-delivery-failed' }, { status: 503 });
+    } catch (error) {
+      const reason = deliveryReasons.has(error?.message) ? error.message : 'telegram-delivery-failed';
+      return Response.json({ reason }, { status: 503 });
     }
     const acceptedAt = Date.now();
     await this.storage.transaction(async (tx) => {

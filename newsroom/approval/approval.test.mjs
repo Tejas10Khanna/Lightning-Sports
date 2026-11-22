@@ -30,6 +30,7 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   const deliveries = [];
   const responses = [];
   const scheduled = [];
+  let telegramFailure;
   const instances = new Map();
   const env = {
     NEWSROOM_INTAKE_TOKEN: 'intake-token',
@@ -56,6 +57,9 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     assert.match(url, /^https:\/\/api\.telegram\.org\/bot1234:mocked-bot\//);
     if (url.endsWith('/sendDocument')) {
+      if (telegramFailure) {
+        return Response.json({ ok: false, description: telegramFailure }, { status: 400 });
+      }
       deliveries.push(options.body);
       return Response.json({ ok: true, result: { message_id: 11 } });
     }
@@ -138,6 +142,12 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   assert.equal(stagedStatus.testOnly, true);
   assert.equal(stagedStatus.deadline - stagedStatus.deliveredAt, 300_000);
   assert.equal(stagedStatus.article, undefined);
+  telegramFailure = 'Bad Request: chat not found';
+  const failed = await call('/staging-reviews', 'x-newsroom-intake-token', 'intake-token', {
+    runKey: '124-1', scenario: 'approve',
+  });
+  assert.equal(failed.status, 503);
+  assert.deepEqual(await failed.json(), { reason: 'telegram-chat-unavailable' });
 });
 
 test('the submission client skips insufficient evidence and sends credentials only as a header', async () => {

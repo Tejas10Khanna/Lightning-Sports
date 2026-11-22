@@ -16,7 +16,9 @@ export function reviewService({ url, token, request = fetch }) {
       const details = response.status === 503 ? await response.json().catch(() => null) : null;
       if (response.status !== 503) await response.body?.cancel();
       const knownReasons = ['telegram-delivery-failed', 'bot-token-missing-or-malformed',
-        'private-chat-bindings-invalid', 'worker-request-failed'];
+        'private-chat-bindings-invalid', 'worker-request-failed', 'telegram-token-rejected',
+        'telegram-chat-unavailable', 'telegram-bot-blocked', 'telegram-request-invalid',
+        'telegram-rate-limited', 'telegram-connection-failed'];
       const reason = knownReasons.includes(details?.reason) ? ' (' + details.reason + ')' : '';
       throw new Error('Telegram review service returned HTTP ' + response.status + reason + '.');
     }
