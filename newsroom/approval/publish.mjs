@@ -23,14 +23,12 @@ export function prepareArticle(packet, revision, time) {
   const paragraphs = packet.paragraphs.map(({ kind, text, evidenceIds }) => {
     const label = kind === 'analysis' ? '**Analysis.** ' :
       kind === 'counterargument' ? '**Counterargument.** ' : '';
-    const links = [...new Set(evidenceIds)].map((id) => {
-      if (!sources.has(id) || !/^E\d{1,2}$/.test(id)) throw new Error('Missing publication citation.');
-      return '[' + id + '](<' + sources.get(id) + '>)';
-    });
-    if (!links.length) throw new Error('Missing publication citation.');
+    if (!evidenceIds.length || evidenceIds.some((id) => !sources.has(id) || !/^E\d{1,2}$/.test(id))) {
+      throw new Error('Missing publication citation.');
+    }
     // A leading number or hyphen can accidentally start a Markdown list.
     const paragraph = inline(text).replace(/^(\d+)([.)]) /, '$1\\$2 ').replace(/^([-+]) /, '\\$1 ');
-    return label + paragraph + ' ' + links.join(' ');
+    return label + paragraph;
   });
   const frontmatter = [
     '---',
