@@ -65,7 +65,10 @@ Prepare a brief from a selected lead. Check its sources and record two or more
 distinct facts in your own words. Include only material permitted for transfer
 to the model provider under your account terms. Review [Groq’s data controls](https://console.groq.com/docs/your-data) for retention settings.
 
-Save the brief as the Actions secret `NEWSROOM_WRITER_BRIEF`. This fictional
+For a brief containing only public facts and URLs, paste its JSON into the
+`public_brief` field when dispatching the draft stage. On this public repository,
+treat workflow inputs as public. For a private brief, leave that field empty and
+save the JSON as the Actions secret `NEWSROOM_WRITER_BRIEF`. This fictional
 example shows the required fields.
 
 ```json
