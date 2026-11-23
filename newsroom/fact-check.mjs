@@ -1,3 +1,5 @@
+import { writeDraft } from './draft.mjs';
+
 const verdicts = ['supported', 'unsupported', 'contradicted', 'unclear'];
 const risks = ['routine', 'sensitive', 'uncertain'];
 const schema = {
@@ -73,4 +75,23 @@ export async function checkDraft(draft, generate) {
     status: flagged ? 'held-for-editorial-review' : 'needs-human-verification',
     factCheck: { scope: 'supplied-evidence', risk: answer.risk, checks },
   };
+}
+
+export async function draftWithEvidenceReview(brief, generate) {
+  const initial = await checkDraft(await writeDraft(brief, generate), generate);
+  if (initial.status !== 'held-for-editorial-review' || initial.factCheck.risk !== 'routine' ||
+      initial.gaps?.length) return initial;
+
+  const { headline, dek, paragraphs, factCheck } = initial;
+  try {
+    const revised = await writeDraft(brief, generate, {
+      headline, dek, paragraphs,
+      checks: factCheck.checks.filter(({ verdict }) => verdict !== 'supported'),
+    });
+    const checked = await checkDraft(revised, generate);
+    return checked.status === 'needs-human-verification' ? checked : initial;
+  } catch {
+    // A failed optional revision leaves the original hold available to the editor.
+    return initial;
+  }
 }
