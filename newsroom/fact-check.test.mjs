@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { checkDraft } from './fact-check.mjs';
+import { checkDraft, draftWithEvidenceReview } from './fact-check.mjs';
 
 const draft = {
   status: 'needs-human-verification',
@@ -64,4 +64,38 @@ test('rejects duplicate check IDs and evidence outside a paragraph’s cited not
 test('skips the model call for a writer hold', async () => {
   const held = { status: 'insufficient-evidence', gaps: ['Need a scorecard.'] };
   assert.equal(await checkDraft(held, async () => assert.fail('Unexpected model call')), held);
+});
+
+test('rechecks one routine revision and preserves the hold if it cannot be cleared', async () => {
+  const brief = { sport: 'Football', topic: 'The winning goal', notes: draft.evidence };
+  const original = {
+    decision: 'draft', headline: draft.headline, dek: draft.dek, gaps: [],
+    paragraphs: [
+      { kind: 'reporting', text: 'One goal decided the match.', primaryEvidenceId: 'E1', evidenceIds: [] },
+      { kind: 'analysis', text: 'The late goal mattered.', primaryEvidenceId: 'E2', evidenceIds: [] },
+      { kind: 'counterargument', text: 'The score alone says little about the chances.', primaryEvidenceId: 'E1', evidenceIds: [] },
+      { kind: 'analysis', text: 'The timing limited the response.', primaryEvidenceId: 'E2', evidenceIds: [] },
+    ],
+  };
+  for (const risk of ['routine', 'sensitive']) {
+    for (const revisionPasses of [true, false]) {
+      let calls = 0;
+      const revised = { ...original, headline: 'The late winner left little time to reply' };
+      const result = await draftWithEvidenceReview(brief, async ({ input }) => {
+        calls++;
+        if (calls === 1) return original;
+        if (calls === 3) {
+          assert.equal(JSON.parse(input).revision.checks[0].unitId, 'headline');
+          return revised;
+        }
+        const verdict = checkUnits(input, risk);
+        if (calls === 2 || !revisionPasses) verdict.checks[0].verdict = 'unsupported';
+        return verdict;
+      });
+      const accepted = risk === 'routine' && revisionPasses;
+      assert.equal(calls, risk === 'routine' ? 4 : 2);
+      assert.equal(result.headline, accepted ? revised.headline : original.headline);
+      assert.equal(result.status, accepted ? 'needs-human-verification' : 'held-for-editorial-review');
+    }
+  }
 });
