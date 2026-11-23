@@ -4,6 +4,7 @@ import { sendForReview } from './approval/submit.mjs';
 import { groqWriter, readBrief, writeDraft } from './draft.mjs';
 import { checkDraft } from './fact-check.mjs';
 import { readSourceConfig } from './feeds.mjs';
+import { footballBrief } from './football-brief.mjs';
 import { decryptReport, encryptReport, readReportKey } from './report.mjs';
 import { buildReview } from './review.mjs';
 
@@ -45,7 +46,8 @@ try {
   if (command === 'collect') {
     await collect(key, process.env);
   } else if (command === 'draft') {
-    const brief = readBrief(process.env.NEWSROOM_WRITER_BRIEF);
+    const briefJson = input ? decryptReport(await readFile(input), key) : process.env.NEWSROOM_WRITER_BRIEF;
+    const brief = readBrief(briefJson);
     const generate = groqWriter(process.env.NEWSROOM_GROQ_API_KEY);
     const packet = await checkDraft(await writeDraft(brief, generate), generate);
     const path = process.env.NEWSROOM_REPORT_FILE || 'newsroom/state/draft.enc';
@@ -62,11 +64,16 @@ try {
     const plaintext = decryptReport(await readFile(input), key);
     await mkdir(dirname(output), { recursive: true });
     await writeFile(output, plaintext, { flag: 'wx', mode: 0o600 });
+  } else if (command === 'football-brief' && input && output) {
+    const match = JSON.parse(await readFile(input, 'utf8'));
+    const brief = footballBrief(match);
+    await mkdir(dirname(output), { recursive: true });
+    await writeFile(output, encryptReport(brief, key), { flag: 'wx', mode: 0o600 });
   } else {
-    throw new Error('Use collect, draft, send-for-review <draft.enc>, or decrypt <report.enc> <output.json>.');
+    throw new Error('Use collect, draft, send-for-review <draft.enc>, decrypt <report.enc> <output.json>, or football-brief <match.json> <brief.enc>.');
   }
 } catch (error) {
-  const safe = /^(NEWSROOM_(REPORT_KEY|GROQ_API_KEY)|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect|Provide a valid NEWSROOM_WRITER_BRIEF|Writer |Fact check |Telegram review service )/;
+  const safe = /^(NEWSROOM_(REPORT_KEY|GROQ_API_KEY)|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect|Provide a valid NEWSROOM_WRITER_BRIEF|Writer |Fact check |Football brief |Telegram review service )/;
   console.error(safe.test(error.message) ? error.message : 'Newsroom command failed. Check configuration and file access.');
   process.exitCode = 1;
 }
