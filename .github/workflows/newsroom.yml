@@ -12,6 +12,10 @@ on:
         type: choice
         default: intake
         options: [intake, draft, groq-test, telegram-test]
+      public_brief:
+        description: Optional draft brief JSON using public facts only. Use the secret for private briefs.
+        type: string
+        required: false
       telegram_scenario:
         description: Expected outcome of the Telegram staging test
         type: choice
@@ -100,6 +104,7 @@ jobs:
       - name: Draft an editorial from the supplied brief
         env:
           NEWSROOM_WRITER_BRIEF: ${{ secrets.NEWSROOM_WRITER_BRIEF }}
+          NEWSROOM_PUBLIC_BRIEF: ${{ inputs.public_brief }}
           NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
           NEWSROOM_GROQ_API_KEY: ${{ secrets.NEWSROOM_GROQ_API_KEY }}
         run: node newsroom/run.mjs draft
