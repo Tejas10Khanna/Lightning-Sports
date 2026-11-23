@@ -54,7 +54,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm test
       - name: Validate the cricket intake adapter
-        run: python3 -m py_compile cricket-intake.py
+        run: python3 cricket-intake-test.py
       - name: Bundle the Cloudflare review service without deploying
         run: npx --yes wrangler@4.166.0 deploy --dry-run --config approval/wrangler.toml
 
@@ -121,6 +121,8 @@ jobs:
           restore-keys: newsroom-cricket-seen-v1-
       - name: Select a recent match and build an evidence brief
         id: scorecard
+        env:
+          NEWSROOM_DATASPORTS_API_KEY: ${{ secrets.NEWSROOM_DATASPORTS_API_KEY }}
         run: |
           mkdir -p newsroom/state
           python3 newsroom/cricket-intake.py newsroom/state/cricket-seen.txt "$RUNNER_TEMP/cricket-brief.json" "$RUNNER_TEMP/cricket-match-id"
