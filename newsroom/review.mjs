@@ -95,6 +95,7 @@ export async function buildReview({ sources, archiveSlugs, storedSeen, key, now 
       generatedAt: new Date(now).toISOString(),
       failedSources: failures,
       candidates: selected.map(({ entries, lead, organizations, primarySource, priority }) => ({
+        leadId: keyDigest(key, 'lead\0' + lead.sport + '\0' + lead.url),
         sport: lead.sport,
         workingHeadline: lead.title,
         priority,
@@ -113,4 +114,17 @@ export async function buildReview({ sources, archiveSlugs, storedSeen, key, now 
     },
     seen: Object.fromEntries([...seen].sort((a, b) => b[1] - a[1]).slice(0, maxStateEntries)),
   };
+}
+
+export function validateLeadBrief(report, leadId, brief) {
+  const lead = Array.isArray(report?.candidates)
+    ? report.candidates.find((candidate) => candidate?.leadId === leadId)
+    : undefined;
+  if (!/^[a-f0-9]{64}$/.test(leadId ?? '') || !lead || !Array.isArray(lead.sources)) {
+    throw new Error('Newsroom lead was not found in the supplied report.');
+  }
+  const sourceUrls = new Set(lead.sources.map(({ url }) => url));
+  if (lead.sport !== brief.sport || !brief.notes.some(({ url }) => sourceUrls.has(url))) {
+    throw new Error('Newsroom lead requires a matching sport and at least one evidence note from its sources.');
+  }
 }
