@@ -29,6 +29,14 @@ test('generates stable Astro article Markdown while keeping evidence out of the 
   assert.throws(() => prepareArticle(wrongCitation, revision, date), /Missing publication citation/);
 });
 
+test('credits Cricsheet and its license once while keeping evidence links private', () => {
+  const evidence = [{ id: 'E1', url: 'https://cricsheet.org/downloads/recently_played_2_json.zip' }];
+  const article = prepareArticle({ ...packet, evidence }, revision, date);
+  assert.match(article.markdown, /Match data from \[Cricsheet\]/);
+  assert.match(article.markdown, /Open Data Commons Attribution License 1.0/);
+  assert.doesNotMatch(article.markdown, /recently_played|\[E1\]/);
+});
+
 test('creates a new file on main and reconciles repeat requests without overwriting', async () => {
   const article = prepareArticle(packet, revision, date);
   let created;
