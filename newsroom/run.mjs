@@ -45,7 +45,7 @@ try {
   if (command === 'collect') {
     await collect(key, process.env);
   } else if (command === 'draft') {
-    const brief = readBrief(process.env.NEWSROOM_WRITER_BRIEF);
+    const brief = readBrief(process.env.NEWSROOM_PUBLIC_BRIEF?.trim() || process.env.NEWSROOM_WRITER_BRIEF);
     const generate = groqWriter(process.env.NEWSROOM_GROQ_API_KEY);
     const packet = await checkDraft(await writeDraft(brief, generate), generate);
     const path = process.env.NEWSROOM_REPORT_FILE || 'newsroom/state/draft.enc';
