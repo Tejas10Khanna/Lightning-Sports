@@ -16,6 +16,14 @@ on:
         description: Optional draft brief JSON using public facts only. Use the secret for private briefs.
         type: string
         required: false
+      intake_artifact:
+        description: Optional encrypted intake artifact name, such as newsroom-review-123456789-1.
+        type: string
+        required: false
+      lead_id:
+        description: Lead ID from the encrypted intake report. Required with intake_artifact.
+        type: string
+        required: false
       telegram_scenario:
         description: Expected outcome of the Telegram staging test
         type: choice
@@ -92,6 +100,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'draft'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -101,13 +112,46 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: npm ci --prefix newsroom --ignore-scripts --no-audit --no-fund
+      - name: Validate the optional intake reference
+        id: intake
+        env:
+          INTAKE_ARTIFACT: ${{ inputs.intake_artifact }}
+          LEAD_ID: ${{ inputs.lead_id }}
+        run: |
+          if [[ -z "$INTAKE_ARTIFACT" && -z "$LEAD_ID" ]]; then
+            exit 0
+          fi
+          if [[ ! "$INTAKE_ARTIFACT" =~ ^newsroom-review-([1-9][0-9]*)-[1-9][0-9]*$ ]]; then
+            echo "::error::Provide the exact newsroom-review artifact name."
+            exit 1
+          fi
+          run_id="${BASH_REMATCH[1]}"
+          if [[ ! "$LEAD_ID" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::Provide the matching 64-character lead ID."
+            exit 1
+          fi
+          printf 'run_id=%s\n' "$run_id" >> "$GITHUB_OUTPUT"
+      - name: Download the encrypted intake report
+        if: steps.intake.outputs.run_id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.intake_artifact }}
+          path: ${{ runner.temp }}/newsroom-intake
+          run-id: ${{ steps.intake.outputs.run_id }}
+          github-token: ${{ github.token }}
       - name: Draft an editorial from the supplied brief
         env:
           NEWSROOM_WRITER_BRIEF: ${{ secrets.NEWSROOM_WRITER_BRIEF }}
           NEWSROOM_PUBLIC_BRIEF: ${{ inputs.public_brief }}
           NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
           NEWSROOM_GROQ_API_KEY: ${{ secrets.NEWSROOM_GROQ_API_KEY }}
-        run: node newsroom/run.mjs draft
+          NEWSROOM_LEAD_ID: ${{ inputs.lead_id }}
+        run: |
+          if [[ -n "$NEWSROOM_LEAD_ID" ]]; then
+            node newsroom/run.mjs draft-from-lead "$RUNNER_TEMP/newsroom-intake/review.enc" "$NEWSROOM_LEAD_ID"
+          else
+            node newsroom/run.mjs draft
+          fi
       - name: Upload encrypted editorial packet
         uses: actions/upload-artifact@v7
         with:
