@@ -61,6 +61,12 @@ private packet. When all feeds fail, the run fails visibly.
 
 ## Draft one editorial
 
+To bind a brief to a collected lead locally, use
+`node newsroom/run.mjs draft-from-lead <review.enc> <lead-id>` with the existing
+brief, Groq, and report-key environment variables. Copy `leadId` from the
+decrypted report. The brief must match the lead's sport and cite at least one
+listed source. Editors can include additional corroborating sources.
+
 Prepare a brief from a selected lead. Check its sources and record two or more
 distinct facts in your own words. Include only material permitted for transfer
 to the model provider under your account terms. Review [Groq’s data controls](https://console.groq.com/docs/your-data) for retention settings.
