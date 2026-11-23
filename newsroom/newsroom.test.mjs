@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 import { collectFeed, parseFeed, readSourceConfig } from './feeds.mjs';
 import { encryptReport, decryptReport, readReportKey } from './report.mjs';
-import { buildReview } from './review.mjs';
+import { buildReview, validateLeadBrief } from './review.mjs';
 
 const now = Date.parse('2026-11-22T08:00:00Z');
 const time = 'Sun, 22 Nov 2026 07:45:00 GMT';
@@ -85,6 +85,13 @@ test('groups duplicate coverage, filters old and archived leads, ranks candidate
   assert.equal(lead.organizations, 2);
   assert.deepEqual(lead.sources.map((entry) => entry.url), ['https://league.example/test', 'https://desk.example/final']);
   assert.equal(lead.sources[0].permissionUrl, 'https://league.example/terms');
+  assert.match(lead.leadId, /^[a-f0-9]{64}$/);
+  const sameLead = await buildReview({ ...options, now: now + 60_000, storedSeen: {} });
+  assert.equal(sameLead.report.candidates[0].leadId, lead.leadId);
+  const brief = { sport: 'Cricket', notes: [{ url: lead.sources[0].url }] };
+  assert.doesNotThrow(() => validateLeadBrief(first.report, lead.leadId, brief));
+  assert.throws(() => validateLeadBrief(first.report, lead.leadId, { ...brief, sport: 'Football' }), /matching sport/);
+  assert.throws(() => validateLeadBrief(first.report, lead.leadId, { ...brief, notes: [] }), /evidence note/);
   assert.ok(Object.keys(first.seen).every((digest) => /^[0-9a-f]{64}$/.test(digest)));
   const repeat = await buildReview({ ...options, now: now + 60_000, storedSeen: first.seen });
   assert.deepEqual(repeat.report.candidates, []);

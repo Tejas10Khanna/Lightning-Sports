@@ -5,7 +5,7 @@ import { groqWriter, readBrief } from './draft.mjs';
 import { draftWithEvidenceReview } from './fact-check.mjs';
 import { readSourceConfig } from './feeds.mjs';
 import { decryptReport, encryptReport, readReportKey } from './report.mjs';
-import { buildReview } from './review.mjs';
+import { buildReview, validateLeadBrief } from './review.mjs';
 
 async function readSeen(path) {
   try {
@@ -44,8 +44,13 @@ try {
   const key = readReportKey(process.env.NEWSROOM_REPORT_KEY);
   if (command === 'collect') {
     await collect(key, process.env);
-  } else if (command === 'draft') {
-    const brief = readBrief(process.env.NEWSROOM_PUBLIC_BRIEF?.trim() || process.env.NEWSROOM_WRITER_BRIEF);
+  } else if (command === 'draft' || command === 'draft-from-lead') {
+    const briefJson = process.env.NEWSROOM_PUBLIC_BRIEF?.trim() || process.env.NEWSROOM_WRITER_BRIEF;
+    const brief = readBrief(briefJson);
+    if (command === 'draft-from-lead') {
+      if (!input || !output) throw new Error('Use draft-from-lead <review.enc> <lead-id>.');
+      validateLeadBrief(JSON.parse(decryptReport(await readFile(input), key)), output, brief);
+    }
     const generate = groqWriter(process.env.NEWSROOM_GROQ_API_KEY);
     const packet = await draftWithEvidenceReview(brief, generate);
     const path = process.env.NEWSROOM_REPORT_FILE || 'newsroom/state/draft.enc';
@@ -63,10 +68,10 @@ try {
     await mkdir(dirname(output), { recursive: true });
     await writeFile(output, plaintext, { flag: 'wx', mode: 0o600 });
   } else {
-    throw new Error('Use collect, draft, send-for-review <draft.enc>, or decrypt <report.enc> <output.json>.');
+    throw new Error('Use collect, draft, send-for-review <draft.enc> or decrypt <report.enc> <output.json>.');
   }
 } catch (error) {
-  const safe = /^(NEWSROOM_(REPORT_KEY|GROQ_API_KEY)|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect|Provide a valid NEWSROOM_WRITER_BRIEF|Writer |Fact check |Telegram review service )/;
+  const safe = /^(NEWSROOM_(REPORT_KEY|GROQ_API_KEY)|Approved sources|Configure between|Invalid source configuration|All configured feeds failed|Use collect|Use draft-from-lead|Provide a valid NEWSROOM_WRITER_BRIEF|Writer |Fact check |Newsroom lead |Telegram review service )/;
   console.error(safe.test(error.message) ? error.message : 'Newsroom command failed. Check configuration and file access.');
   process.exitCode = 1;
 }
