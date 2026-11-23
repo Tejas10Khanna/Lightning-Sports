@@ -1,8 +1,8 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { sendForReview } from './approval/submit.mjs';
-import { groqWriter, readBrief, writeDraft } from './draft.mjs';
-import { checkDraft } from './fact-check.mjs';
+import { groqWriter, readBrief } from './draft.mjs';
+import { draftWithEvidenceReview } from './fact-check.mjs';
 import { readSourceConfig } from './feeds.mjs';
 import { decryptReport, encryptReport, readReportKey } from './report.mjs';
 import { buildReview } from './review.mjs';
@@ -47,7 +47,7 @@ try {
   } else if (command === 'draft') {
     const brief = readBrief(process.env.NEWSROOM_PUBLIC_BRIEF?.trim() || process.env.NEWSROOM_WRITER_BRIEF);
     const generate = groqWriter(process.env.NEWSROOM_GROQ_API_KEY);
-    const packet = await checkDraft(await writeDraft(brief, generate), generate);
+    const packet = await draftWithEvidenceReview(brief, generate);
     const path = process.env.NEWSROOM_REPORT_FILE || 'newsroom/state/draft.enc';
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, encryptReport(packet, key), { flag: 'wx', mode: 0o600 });
