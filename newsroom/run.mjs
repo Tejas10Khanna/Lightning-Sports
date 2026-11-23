@@ -59,6 +59,9 @@ try {
     console.log('Editorial packet saved with status %s.', packet.status);
   } else if (command === 'send-for-review' && input) {
     const packet = JSON.parse(decryptReport(await readFile(input), key));
+    if (process.env.NEWSROOM_REVIEW_ONLY === 'true' && packet.status === 'needs-human-verification') {
+      packet.status = 'held-for-editorial-review';
+    }
     const status = await sendForReview(packet, {
       url: process.env.NEWSROOM_APPROVAL_URL, token: process.env.NEWSROOM_INTAKE_TOKEN,
     });
