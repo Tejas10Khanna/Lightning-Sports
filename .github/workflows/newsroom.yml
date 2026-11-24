@@ -1,6 +1,10 @@
 name: Newsroom intake
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'newsroom/cricket-intake.py'
   pull_request:
     paths:
       - 'newsroom/**'
@@ -97,6 +101,19 @@ jobs:
         with:
           path: newsroom/state/seen.json
           key: newsroom-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+  cricket-provider-check:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Compare a reference game without drafting or delivering
+        env:
+          NEWSROOM_DATASPORTS_API_KEY: ${{ secrets.NEWSROOM_DATASPORTS_API_KEY }}
+        run: python3 newsroom/cricket-intake.py --verify-only
 
   cricket-intake:
     if: github.ref == 'refs/heads/main' && ((github.event_name == 'schedule' && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
