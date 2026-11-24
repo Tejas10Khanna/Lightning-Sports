@@ -143,7 +143,7 @@ jobs:
           fi
 
   cricket-intake:
-    if: github.ref == 'refs/heads/main' && ((github.event_name == 'schedule' && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
+    if: github.ref == 'refs/heads/main' && (((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
