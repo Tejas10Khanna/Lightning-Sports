@@ -7,6 +7,7 @@ on:
       - 'newsroom/cricket-intake.py'
       - 'newsroom/cricket-database-intake.py'
       - 'newsroom/football-intake.mjs'
+      - 'newsroom/football-brief.mjs'
       - 'newsroom/run.mjs'
       - '.github/workflows/newsroom.yml'
   pull_request:
@@ -62,6 +63,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm test
+      - run: node -e "import('./football-intake.mjs')"
       - name: Validate the cricket intake adapter
         run: python3 cricket-intake-test.py
       - name: Bundle the Cloudflare review service without deploying
