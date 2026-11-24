@@ -35,6 +35,9 @@ export function prepareArticle(packet, revision, time) {
   if (usesCricsheet) {
     paragraphs.push('Match data from [Cricsheet](https://cricsheet.org/), licensed under the [Open Data Commons Attribution License 1.0](https://opendatacommons.org/licenses/by/1-0/). Statistics are derived from the source scorecard.');
   }
+  if ([...sources.values()].some((url) => new URL(url).origin === 'https://api.openligadb.de')) {
+    paragraphs.push('Match data from [OpenLigaDB](https://www.openligadb.de/), licensed under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/).');
+  }
   const frontmatter = [
     '---',
     'title: ' + JSON.stringify(packet.headline),
