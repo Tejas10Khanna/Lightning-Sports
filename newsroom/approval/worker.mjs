@@ -1,6 +1,8 @@
 import { attachDelivery, decide, expireReview } from './state.mjs';
 import { checkLiveArticle, commitArticle, prepareArticle } from './publish.mjs';
 import { stagingPacket } from './staging-packet.mjs';
+import { groqWriter, readBrief, writeDraft } from '../draft.mjs';
+import { checkDraft } from '../fact-check.mjs';
 
 const encoder = new TextEncoder();
 const deliveryReasons = new Set([
@@ -11,7 +13,8 @@ const controls = { a: 'approve', e: 'edit', r: 'reject' };
 const statusText = {
   approved: 'Approval recorded.',
   'checks-unresolved': 'Approval blocked. Open the fact-check report and request edits before publishing.',
-  'needs-edit': 'Edit requested. Submit a revised draft for a new review.',
+  'needs-edit': 'Edit requested. The original draft remains unpublished.',
+  'revision-queued': 'Edit requested. A revision and fresh fact check are queued.',
   rejected: 'Draft rejected.',
   committed: 'Article committed. Checking the live site.',
   published: 'Article is live.',
@@ -157,6 +160,9 @@ export class EditorialReview {
           await tx.put('review', updated);
           if (updated.status === 'approved' && !updated.testOnly && this.env.NEWSROOM_PUBLISH_ENABLED === 'true') {
             await tx.setAlarm(Date.now());
+          } else if (updated.status === 'needs-edit' && updated.packet && this.env.NEWSROOM_GROQ_API_KEY?.trim()) {
+            await tx.setAlarm(Date.now());
+            return 'revision-queued';
           }
         }
         return updated.status;
@@ -177,7 +183,7 @@ export class EditorialReview {
       const original = await tx.get('review');
       if (original && (original.status !== 'delivering' || original.reservedAt > now - 30_000)) return original;
       const review = { revision, status: 'delivering', reservedAt: now, factCheckPassed, testOnly,
-        independentlyVerified: autoPublish };
+        independentlyVerified: autoPublish, ...(!testOnly && packet.evidence.every((note) => typeof note.fact === 'string') ? { packet } : {}) };
       await tx.put('review', review);
       return null;
     });
@@ -200,6 +206,48 @@ export class EditorialReview {
     return Response.json({ revision, status: 'awaiting-decision' }, { status: 201 });
   }
 
+  async revise(review) {
+    const packet = review.packet;
+    let revised = review.revisionDraft;
+    if (!revised) try {
+      const brief = readBrief(JSON.stringify({
+        sport: packet.sport,
+        modelUseApproved: true,
+        topic: 'Revise this editorial using only the supplied facts. Remove unsupported claims and keep analysis within the evidence.',
+        evidence: packet.evidence,
+      }));
+      const generate = groqWriter(this.env.NEWSROOM_GROQ_API_KEY);
+      const { headline, dek, paragraphs } = packet;
+      revised = await checkDraft(await writeDraft(brief, generate, {
+        headline, dek, paragraphs,
+        checks: packet.factCheck?.checks?.filter(({ verdict }) => verdict !== 'supported') ?? [],
+      }), generate);
+    } catch {
+      revised = undefined;
+    }
+    if (revised && allChecksPassed(revised)) {
+      const revision = await draftRevision(revised);
+      if (revision !== review.revision) {
+        if (!review.revisionDraft) await this.storage.put('review', { ...review, revisionDraft: revised });
+        const response = await reviewStub(this.env, revision).fetch('https://review.internal/submit', {
+          method: 'POST', body: JSON.stringify({ revision, packet: revised }),
+        });
+        if (!response.ok) throw new Error('Revised draft delivery failed.');
+        const { status } = await response.json();
+        if (status === 'delivering') throw new Error('Revised draft delivery is still pending.');
+        await this.storage.put('review', { ...review, packet: undefined, revisionDraft: undefined, replacement: revision });
+        return;
+      }
+    }
+    await this.storage.put('review', { ...review, packet: undefined });
+    const form = new FormData();
+    form.set('chat_id', this.env.TELEGRAM_CHAT_ID);
+    form.set('message_id', String(review.messageId));
+    form.set('caption', packet.sport + ' editorial review\n' + packet.headline +
+      '\nThe automatic revision did not clear its checks. This draft remains unpublished.');
+    await botRequest(this.env, 'editMessageCaption', form).catch(() => {});
+  }
+
   async alarm() {
     const autoPublish = this.env.NEWSROOM_TIMEOUT_PUBLISH_ENABLED === 'true' &&
       this.env.NEWSROOM_PUBLISH_ENABLED === 'true';
@@ -212,7 +260,9 @@ export class EditorialReview {
       if (updated !== original) await tx.put('review', updated);
       return updated;
     });
-    if (review?.status === 'approved' && !review.testOnly && this.env.NEWSROOM_PUBLISH_ENABLED === 'true') {
+    if (review?.status === 'needs-edit' && review.packet && this.env.NEWSROOM_GROQ_API_KEY?.trim()) {
+      await this.revise(review);
+    } else if (review?.status === 'approved' && !review.testOnly && this.env.NEWSROOM_PUBLISH_ENABLED === 'true') {
       const result = await commitArticle(review.article, this.env.NEWSROOM_GITHUB_TOKEN);
       await this.storage.transaction(async (tx) => {
         await tx.put('review', { ...review, status: 'committed', result, checks: 0 });
@@ -228,6 +278,12 @@ export class EditorialReview {
       });
     }
   }
+}
+
+async function draftRevision(packet) {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(JSON.stringify(packet)));
+  return Array.from(new Uint8Array(digest).subarray(0, 16),
+    (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function reviewStub(env, id) {
@@ -276,9 +332,7 @@ export default {
         // Only an independent verifier may attest that this exact submission cleared its evidence and rights checks.
         const independentlyVerified = path === '/reviews' && !packet.testOnly && await sameSecret(
           request.headers.get('x-newsroom-verifier-token'), env.NEWSROOM_VERIFIER_TOKEN);
-        const digest = await crypto.subtle.digest('SHA-256', encoder.encode(JSON.stringify(packet)));
-        const revision = Array.from(new Uint8Array(digest).subarray(0, 16),
-          (byte) => byte.toString(16).padStart(2, '0')).join('');
+        const revision = await draftRevision(packet);
         return await reviewStub(env, revision).fetch('https://review.internal/submit', {
           method: 'POST', body: JSON.stringify({ revision, packet, independentlyVerified }),
         });
