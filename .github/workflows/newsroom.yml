@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'newsroom/cricket-intake.py'
+      - 'newsroom/run.mjs'
   pull_request:
     paths:
       - 'newsroom/**'
@@ -63,7 +64,7 @@ jobs:
         run: npx --yes wrangler@4.166.0 deploy --dry-run --config approval/wrangler.toml
 
   collect:
-    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || (github.event_name == 'schedule' && vars.NEWSROOM_ENABLED == 'true'))
+    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || ((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_ENABLED != 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
