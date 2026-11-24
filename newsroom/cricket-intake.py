@@ -75,6 +75,7 @@ def report_comparison(match_date, expected=None):
             reason = detail.get("code") if isinstance(detail, dict) else detail
             if reason in (
                 "unauthorized", "forbidden", "invalid_key", "invalid_api_key", "missing_api_key",
+                "ip_not_allowed", "origin_not_allowed", "browser_signature_banned",
                 "endpoint_not_in_plan", "history_not_in_plan", "rate_limited", "quota_exceeded",
                 "bad_request", "upstream_unavailable",
             ):
@@ -85,7 +86,9 @@ def report_comparison(match_date, expected=None):
 
     def fetch(path):
         request = urllib.request.Request("https://api.datasportsapi.com/v2" + path, headers={
-            "Authorization": "Bearer " + key, "Accept": "application/json",
+            "Authorization": "Bearer " + key,
+            "Accept": "application/json",
+            "User-Agent": "LightningSportsNewsroom/1.0 (+https://www.lightningsports.tech/)",
         })
         with opener.open(request, timeout=10) as response:
             payload = response.read(MAX_ARCHIVE_BYTES + 1)
