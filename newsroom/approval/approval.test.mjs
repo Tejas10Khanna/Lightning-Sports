@@ -63,12 +63,28 @@ test('a trusted submission sends a protected attachment and binds decisions to t
           put: (key, value) => data.set(key, value),
           setAlarm: (deadline) => scheduled.push(deadline),
         };
-        instances.set(id, new EditorialReview({ storage: { transaction: (run) => run(tx) } }, env));
+        instances.set(id, new EditorialReview({ storage: { put: tx.put, transaction: (run) => run(tx) } }, env));
       }
       return { fetch: (url, options) => instances.get(id).fetch(new Request(url, options)) };
     },
   };
   t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url.startsWith('https://api.groq.com/')) {
+      const input = JSON.parse(JSON.parse(options.body).messages[1].content);
+      const result = input.units ? {
+        risk: 'routine',
+        checks: input.units.map(({ id, evidenceIds }) => ({
+          unitId: id, verdict: 'supported', explanation: 'Supported.', evidenceIds: [evidenceIds[0]],
+        })),
+      } : {
+        decision: 'draft', headline: 'Revised score review', dek: 'What the scores show.', gaps: [],
+        paragraphs: ['reporting', 'analysis', 'counterargument', 'analysis'].map((kind, index) => ({
+          kind, text: 'An evidence-led paragraph.', primaryEvidenceId: index ? 'E2' : 'E1',
+          evidenceIds: [index ? 'E2' : 'E1'],
+        })),
+      };
+      return Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(result) } }] });
+    }
     assert.equal(options.redirect, 'manual');
     if (url.startsWith('https://api.github.com/')) {
       assert.equal(options.headers.authorization, 'Bearer example-publisher');
@@ -194,6 +210,23 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   await instances.get(verifiedRevision).alarm();
   assert.equal(writes, 1);
   now.mock.restore();
+
+  env.NEWSROOM_GROQ_API_KEY = 'example-groq';
+  const revisionRequest = await call('/reviews', 'x-newsroom-intake-token', 'intake-token', {
+    ...packet, status: 'held-for-editorial-review', headline: 'Draft with notes',
+    evidence: packet.evidence.map((note, index) => ({ ...note, fact: 'Fixture fact ' + index })),
+  });
+  assert.equal(revisionRequest.status, 201);
+  const { revision: originalRevision } = await revisionRequest.json();
+  await callback('webhook-token', 42, 11, 'e', originalRevision);
+  assert.match(responses.at(-1), /revision and fresh fact check are queued/);
+  const deliveryCount = deliveries.length;
+  await instances.get(originalRevision).alarm();
+  assert.equal(deliveries.length, deliveryCount + 1);
+  assert.match(deliveries.at(-1).get('caption'), /Revised score review/);
+  await instances.get(originalRevision).alarm();
+  assert.equal(deliveries.length, deliveryCount + 1);
+  assert.equal(writes, 1);
 
   telegramFailure = 'Bad Request: chat not found';
   const failed = await call('/staging-reviews', 'x-newsroom-intake-token', 'intake-token', {
