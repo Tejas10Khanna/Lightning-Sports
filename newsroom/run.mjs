@@ -21,7 +21,17 @@ async function readSeen(path) {
 }
 
 async function collect(key, env) {
-  const sources = readSourceConfig(env.NEWSROOM_SOURCES);
+  const gdelt = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
+  gdelt.search = new URLSearchParams({
+    query: '(domain:premierleague.com OR domain:thefa.com) sourcelang:english',
+    mode: 'artlist', format: 'rss', timespan: '24h', maxrecords: '40', sort: 'datedesc',
+  });
+  const sources = readSourceConfig(env.NEWSROOM_SOURCES || JSON.stringify([{
+    id: 'gdelt-football', organization: 'gdelt-index', sport: 'Football', role: 'reporting',
+    feedUrl: gdelt.href,
+    articleHosts: ['www.premierleague.com', 'www.thefa.com', 'premierleague.com', 'thefa.com'],
+    permissionUrl: 'https://www.gdeltproject.org/about.html',
+  }]));
   const stateFile = env.NEWSROOM_STATE_FILE || 'newsroom/state/seen.json';
   const reportFile = env.NEWSROOM_REPORT_FILE || 'newsroom/state/review.enc';
   const articles = await readdir(new URL('../src/content/posts/', import.meta.url));
