@@ -84,6 +84,16 @@ def report_comparison(match_date, expected=None):
             status = compare_scorecard(match_date, expected, fetch)
     except urllib.error.HTTPError as error:
         status = f"provider HTTP {error.code}"
+        if error.code in {401, 403}:
+            query = urllib.parse.urlencode({"sport": "football", "date": match_date, "page": 0})
+            try:
+                control = fetch("/fixtures?" + query)
+                if isinstance(control.get("data"), list):
+                    status += "; football control accepted"
+            except urllib.error.HTTPError as control_error:
+                status += f"; football control HTTP {control_error.code}"
+            except (OSError, ValueError, TypeError, AttributeError):
+                status += "; football control unavailable"
     except (OSError, KeyError, ValueError, TypeError, AttributeError):
         status = "provider response unavailable or invalid"
     print(f"DataSportsAPI comparison: {status}.")
