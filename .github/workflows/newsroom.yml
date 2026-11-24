@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Check Cricket Database completed-match results
+      - name: Check Cricket Database match records
         shell: bash
         env:
           NEWSROOM_CRICKET_DATABASE_KEY: ${{ secrets.NEWSROOM_CRICKET_DATABASE_KEY }}
@@ -120,12 +120,12 @@ jobs:
           fi
           count=$(curl --silent --show-error --fail --max-time 20 --max-filesize 1048576 \
             -H "Authorization: Bearer $NEWSROOM_CRICKET_DATABASE_KEY" -H 'Accept: application/json' \
-            'https://api.cricketdatabase.com/v1/results/yesterday' \
+            'https://api.cricketdatabase.com/v1/matches?limit=5' \
             | jq -ers 'if length == 1 and (.[0].data | type == "array" and all(.[]; type == "object")) then .[0].data | length else error("Invalid results response") end')
           if [[ "$count" -eq 0 ]]; then
-            echo "::warning::Cricket Database responded successfully with zero completed matches."
+            echo "::warning::Cricket Database responded successfully with zero match records."
           else
-            echo "Cricket Database returned $count completed matches. No data was sent to a model or published."
+            echo "Cricket Database returned $count match records. No data was sent to a model or published."
           fi
 
   cricket-intake:
