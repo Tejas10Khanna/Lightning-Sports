@@ -14,6 +14,7 @@ import zipfile
 
 
 ARCHIVE = "https://cricsheet.org/downloads/recently_played_2_json.zip"
+VERIFICATION_ARCHIVE = "https://cricsheet.org/downloads/recently_played_7_json.zip"
 MAX_ARCHIVE_BYTES = 8_000_000
 MAX_MATCH_BYTES = 700_000
 
@@ -83,10 +84,10 @@ def report_comparison(match_date, expected):
     print(f"DataSportsAPI comparison: {status}.")
 
 
-def candidate(match_id, match, today):
+def candidate(match_id, match, today, max_age_days):
     info = match["info"]
     match_date = dt.date.fromisoformat(info["dates"][-1])
-    if not today - dt.timedelta(days=2) <= match_date <= today:
+    if not today - dt.timedelta(days=max_age_days) <= match_date <= today:
         return None
     match_type = info["match_type"]
     if match_type not in {"T20", "ODI"} or info.get("missing"):
@@ -127,7 +128,7 @@ def candidate(match_id, match, today):
     }, totals)
 
 
-def select(archive, seen, today):
+def select(archive, seen, today, max_age_days=2):
     picks = []
     with zipfile.ZipFile(archive) as bundle:
         members = bundle.infolist()
@@ -141,7 +142,7 @@ def select(archive, seen, today):
             if match_id in seen:
                 continue
             try:
-                pick = candidate(match_id, json.loads(bundle.read(entry)), today)
+                pick = candidate(match_id, json.loads(bundle.read(entry)), today, max_age_days)
             except (KeyError, IndexError, ValueError, TypeError, StopIteration, AttributeError):
                 continue
             if pick:
@@ -149,19 +150,40 @@ def select(archive, seen, today):
     return max(picks, key=lambda row: row[:3], default=None)
 
 
-def main():
-    seen_path, brief_path, id_path = map(Path, sys.argv[1:])
-    seen = set(seen_path.read_text().splitlines()) if seen_path.exists() else set()
-    with urllib.request.urlopen(ARCHIVE, timeout=20) as response:
-        if response.geturl() != ARCHIVE:
+def download_archive(url):
+    with urllib.request.urlopen(url, timeout=20) as response:
+        if response.geturl() != url:
             raise ValueError("Cricsheet archive unexpectedly redirected.")
         archive = response.read(MAX_ARCHIVE_BYTES + 1)
     if len(archive) > MAX_ARCHIVE_BYTES:
         raise ValueError("Cricsheet archive is too large.")
+    return io.BytesIO(archive)
+
+
+def check_reference(today):
+    if not os.environ.get("NEWSROOM_DATASPORTS_API_KEY", "").strip():
+        print("DataSportsAPI comparison skipped: key unavailable.")
+        return
+    sample = select(download_archive(VERIFICATION_ARCHIVE), set(), today, max_age_days=6)
+    if sample is None:
+        print("No recent cricket scorecard was available for verification.")
+        return
+    match_date, _, _, _, totals = sample
+    print("Checking a reference scorecard without creating a draft.")
+    report_comparison(match_date, totals)
+
+
+def main():
     today = dt.datetime.now(dt.timezone.utc).date()
-    pick = select(io.BytesIO(archive), seen, today)
+    if sys.argv[1:] == ["--verify-only"]:
+        check_reference(today)
+        return
+    seen_path, brief_path, id_path = map(Path, sys.argv[1:])
+    seen = set(seen_path.read_text().splitlines()) if seen_path.exists() else set()
+    pick = select(download_archive(ARCHIVE), seen, today)
     if pick is None:
         print("No new eligible cricket scorecard.")
+        check_reference(today)
         return
     match_date, _, match_id, brief, totals = pick
     report_comparison(match_date, totals)
