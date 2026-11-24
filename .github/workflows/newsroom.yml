@@ -6,6 +6,7 @@ on:
     paths:
       - 'newsroom/cricket-intake.py'
       - 'newsroom/run.mjs'
+      - '.github/workflows/newsroom.yml'
   pull_request:
     paths:
       - 'newsroom/**'
@@ -16,7 +17,7 @@ on:
         description: Newsroom stage to run
         type: choice
         default: intake
-        options: [intake, draft, groq-test, telegram-test, cricket-intake]
+        options: [intake, draft, groq-test, telegram-test, cricket-intake, cricket-provider-check]
       public_brief:
         description: Optional draft brief JSON using public facts only. Use the secret for private briefs.
         type: string
@@ -104,17 +105,28 @@ jobs:
           key: newsroom-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
   cricket-provider-check:
-    if: github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-provider-check'))
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Compare a reference game without drafting or delivering
+      - name: Check Cricket Database completed-match results
+        shell: bash
         env:
-          NEWSROOM_DATASPORTS_API_KEY: ${{ secrets.NEWSROOM_DATASPORTS_API_KEY }}
-        run: python3 newsroom/cricket-intake.py --verify-only
+          NEWSROOM_CRICKET_DATABASE_KEY: ${{ secrets.NEWSROOM_CRICKET_DATABASE_KEY }}
+        run: |
+          if [[ -z "$NEWSROOM_CRICKET_DATABASE_KEY" ]]; then
+            echo "::notice::Cricket Database check skipped because NEWSROOM_CRICKET_DATABASE_KEY is missing."
+            exit 0
+          fi
+          count=$(curl --silent --show-error --fail --max-time 20 --max-filesize 1048576 \
+            -H "Authorization: Bearer $NEWSROOM_CRICKET_DATABASE_KEY" -H 'Accept: application/json' \
+            'https://api.cricketdatabase.com/v1/results/yesterday' \
+            | jq -ers 'if length == 1 and (.[0].data | type == "array" and all(.[]; type == "object")) then .[0].data | length else error("Invalid results response") end')
+          if [[ "$count" -eq 0 ]]; then
+            echo "::warning::Cricket Database responded successfully with zero completed matches."
+          else
+            echo "Cricket Database returned $count completed matches. No data was sent to a model or published."
+          fi
 
   cricket-intake:
     if: github.ref == 'refs/heads/main' && ((github.event_name == 'schedule' && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
