@@ -58,7 +58,7 @@ def compare_scorecard(match_date, expected, fetch):
     return "innings totals match" if observed == expected else "innings totals differ"
 
 
-def report_comparison(match_date, expected):
+def report_comparison(match_date, expected=None):
     key = os.environ.get("NEWSROOM_DATASPORTS_API_KEY", "").strip()
     if not key:
         print("DataSportsAPI comparison skipped: key unavailable.")
@@ -76,7 +76,12 @@ def report_comparison(match_date, expected):
         return json.loads(payload)
 
     try:
-        status = compare_scorecard(match_date, expected, fetch)
+        if expected is None:
+            query = urllib.parse.urlencode({"sport": "cricket", "date": match_date, "page": 0})
+            result = fetch("/fixtures?" + query)
+            status = "key accepted; no scorecard compared" if isinstance(result.get("data"), list) else "invalid fixtures response"
+        else:
+            status = compare_scorecard(match_date, expected, fetch)
     except urllib.error.HTTPError as error:
         status = f"provider HTTP {error.code}"
     except (OSError, KeyError, ValueError, TypeError, AttributeError):
@@ -167,6 +172,7 @@ def check_reference(today):
     sample = select(download_archive(VERIFICATION_ARCHIVE), set(), today, max_age_days=6)
     if sample is None:
         print("No recent cricket scorecard was available for verification.")
+        report_comparison(today)
         return
     match_date, _, _, _, totals = sample
     print("Checking a reference scorecard without creating a draft.")
