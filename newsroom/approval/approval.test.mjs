@@ -14,6 +14,19 @@ test('deadline starts after delivery and timeouts stay in manual review', () => 
   assert.equal(decide(timedOut, { action: 'approve', messageId: 9, now: initial.deadline }).status, 'approved');
 });
 
+test('only independently verified, fact-checked production drafts can be approved by the deadline', () => {
+  const review = attachDelivery({ independentlyVerified: true, factCheckPassed: true }, 9, 100);
+  assert.equal(expireReview(review, review.deadline - 1, true), review);
+  assert.equal(expireReview(review, review.deadline, true).decision, 'verified-timeout');
+  for (const overrides of [{ independentlyVerified: false }, { factCheckPassed: false }, { testOnly: true }]) {
+    assert.equal(expireReview({ ...review, ...overrides }, review.deadline, true).status, 'manual-review');
+  }
+  for (const action of ['edit', 'reject']) {
+    const decided = decide(review, { action, messageId: 9, now: review.deadline - 1 });
+    assert.equal(expireReview(decided, review.deadline, true), decided);
+  }
+});
+
 test('edit and reject stop a review and a held draft cannot be approved', () => {
   const initial = attachDelivery({ factCheckPassed: false }, 9, 0);
   assert.equal(decide(initial, { action: 'approve', messageId: 9, now: 1 }), initial);
@@ -31,6 +44,7 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   const responses = [];
   const scheduled = [];
   let telegramFailure;
+  let writes = 0;
   const instances = new Map();
   const env = {
     NEWSROOM_INTAKE_TOKEN: 'intake-token',
@@ -56,6 +70,12 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   };
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     assert.equal(options.redirect, 'manual');
+    if (url.startsWith('https://api.github.com/')) {
+      assert.equal(options.headers.authorization, 'Bearer example-publisher');
+      if (options.method !== 'PUT') return new Response(null, { status: 404 });
+      writes++;
+      return Response.json({ commit: { sha: 'example-commit' } }, { status: 201 });
+    }
     assert.match(url, /^https:\/\/api\.telegram\.org\/bot1234:mocked-bot\//);
     if (url.endsWith('/sendDocument')) {
       if (telegramFailure) {
@@ -143,6 +163,27 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   assert.equal(stagedStatus.testOnly, true);
   assert.equal(stagedStatus.deadline - stagedStatus.deliveredAt, 300_000);
   assert.equal(stagedStatus.article, undefined);
+  env.NEWSROOM_TIMEOUT_PUBLISH_ENABLED = 'true';
+  env.NEWSROOM_VERIFIER_TOKEN = 'verifier-token';
+  env.NEWSROOM_GITHUB_TOKEN = 'example-publisher';
+  const verified = await worker.fetch(new Request('https://newsroom.example/reviews', {
+    method: 'POST',
+    headers: { 'x-newsroom-intake-token': 'intake-token', 'x-newsroom-verifier-token': 'verifier-token' },
+    body: JSON.stringify({ ...packet, headline: 'Independently verified final' }),
+  }), env);
+  assert.equal(verified.status, 201);
+  const { revision: verifiedRevision } = await verified.json();
+  assert.notEqual(verifiedRevision, revision);
+  assert.match(deliveries.at(-1).get('caption'), /Publishes after five minutes/);
+  const deadline = scheduled.at(-1);
+  const now = t.mock.method(Date, 'now', () => deadline - 1);
+  await instances.get(verifiedRevision).alarm();
+  assert.equal(writes, 0);
+  now.mock.mockImplementation(() => deadline);
+  await instances.get(verifiedRevision).alarm();
+  assert.equal(writes, 1);
+  now.mock.restore();
+
   telegramFailure = 'Bad Request: chat not found';
   const failed = await call('/staging-reviews', 'x-newsroom-intake-token', 'intake-token', {
     runKey: '124-1', scenario: 'approve',
