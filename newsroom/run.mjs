@@ -41,7 +41,10 @@ async function collect(key, env) {
   });
   console.log('Newsroom review: %d candidates, %d/%d feed failures.',
     report.candidates.length, report.failedSources.length, sources.length);
-  if (report.failedSources.length === sources.length) throw new Error('All configured feeds failed.');
+  if (report.failedSources.length === sources.length) {
+    if (env.NEWSROOM_SOURCES) throw new Error('All configured feeds failed.');
+    console.warn('::warning::GDELT discovery unavailable. This report contains no candidates.');
+  }
 
   await mkdir(dirname(stateFile), { recursive: true });
   await mkdir(dirname(reportFile), { recursive: true });
