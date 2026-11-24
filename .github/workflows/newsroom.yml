@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'newsroom/cricket-intake.py'
+      - 'newsroom/cricket-database-intake.py'
       - 'newsroom/run.mjs'
       - '.github/workflows/newsroom.yml'
   pull_request:
@@ -109,6 +110,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Check Cricket Database match records
         shell: bash
         env:
@@ -128,8 +132,18 @@ jobs:
             echo "Cricket Database returned $count match records. No data was sent to a model or published."
           fi
 
+      - name: Validate brief selection against recent completed matches
+        env:
+          NEWSROOM_CRICKET_DATABASE_KEY: ${{ secrets.NEWSROOM_CRICKET_DATABASE_KEY }}
+        run: |
+          python3 newsroom/cricket-database-intake.py "$RUNNER_TEMP/unused-seen" "$RUNNER_TEMP/probe-brief.json" "$RUNNER_TEMP/probe-match-id"
+          if [[ -f "$RUNNER_TEMP/probe-brief.json" ]]; then
+            jq -e '.sport == "Cricket" and (.evidence | length >= 2)' "$RUNNER_TEMP/probe-brief.json" >/dev/null
+            echo "The completed-results response produced an evidence brief."
+          fi
+
   cricket-intake:
-    if: github.ref == 'refs/heads/main' && ((github.event_name == 'schedule' && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
+    if: github.ref == 'refs/heads/main' && (((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -152,10 +166,10 @@ jobs:
       - name: Select a recent match and build an evidence brief
         id: scorecard
         env:
-          NEWSROOM_DATASPORTS_API_KEY: ${{ secrets.NEWSROOM_DATASPORTS_API_KEY }}
+          NEWSROOM_CRICKET_DATABASE_KEY: ${{ secrets.NEWSROOM_CRICKET_DATABASE_KEY }}
         run: |
           mkdir -p newsroom/state
-          python3 newsroom/cricket-intake.py newsroom/state/cricket-seen.txt "$RUNNER_TEMP/cricket-brief.json" "$RUNNER_TEMP/cricket-match-id"
+          python3 newsroom/cricket-database-intake.py newsroom/state/cricket-seen.txt "$RUNNER_TEMP/cricket-brief.json" "$RUNNER_TEMP/cricket-match-id"
           if [[ -f "$RUNNER_TEMP/cricket-match-id" ]]; then
             echo 'selected=true' >> "$GITHUB_OUTPUT"
           fi
