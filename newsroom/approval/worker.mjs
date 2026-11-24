@@ -10,6 +10,7 @@ const deliveryReasons = new Set([
 const controls = { a: 'approve', e: 'edit', r: 'reject' };
 const statusText = {
   approved: 'Approval recorded.',
+  'checks-unresolved': 'Approval blocked. Open the fact-check report and request edits before publishing.',
   'needs-edit': 'Edit requested. Submit a revised draft for a new review.',
   rejected: 'Draft rejected.',
   committed: 'Article committed. Checking the live site.',
@@ -95,6 +96,14 @@ async function botRequest(env, method, body) {
   return result.result;
 }
 
+function reviewButtons(revision) {
+  return JSON.stringify({ inline_keyboard: [[
+    { text: 'Approve', callback_data: 'a:' + revision },
+    { text: 'Edit', callback_data: 'e:' + revision },
+    { text: 'Reject', callback_data: 'r:' + revision },
+  ]] });
+}
+
 async function deliver(env, revision, packet, factCheckPassed, autoPublish) {
   const form = new FormData();
   form.set('chat_id', env.TELEGRAM_CHAT_ID);
@@ -102,14 +111,10 @@ async function deliver(env, revision, packet, factCheckPassed, autoPublish) {
   form.set('document', new Blob([reviewDocument(packet)], { type: 'text/plain' }), 'editorial-draft.txt');
   const directions = packet.testOnly ? packet.dek : factCheckPassed
     ? (autoPublish ? 'Publishes after five minutes unless you request edits or reject.'
-      : 'Confirm facts, citations, and rights before approving.') : 'Held for editorial review.';
+      : 'Approve after checking the facts and sources. The five-minute deadline cannot publish this draft automatically.')
+    : 'Fact checks need attention. Open the attached report before choosing an action.';
   form.set('caption', packet.sport + ' editorial review\n' + packet.headline + '\n' + directions);
-  const buttons = [
-    { text: 'Edit', callback_data: 'e:' + revision },
-    { text: 'Reject', callback_data: 'r:' + revision },
-  ];
-  if (factCheckPassed) buttons.unshift({ text: 'Approve', callback_data: 'a:' + revision });
-  form.set('reply_markup', JSON.stringify({ inline_keyboard: [buttons] }));
+  form.set('reply_markup', reviewButtons(revision));
   const result = await botRequest(env, 'sendDocument', form);
   if (!Number.isSafeInteger(result?.message_id)) throw new Error('Telegram delivery could not be confirmed.');
   return result.message_id;
@@ -145,6 +150,8 @@ export class EditorialReview {
       const status = await this.storage.transaction(async (tx) => {
         const original = await tx.get('review');
         if (!original || original.messageId !== input.messageId) return 'unavailable';
+        if (input.action === 'approve' && !original.factCheckPassed &&
+            ['awaiting-decision', 'manual-review'].includes(original.status)) return 'checks-unresolved';
         const updated = decide(original, { ...input, now: Date.now() });
         if (updated !== original) {
           await tx.put('review', updated);
@@ -289,6 +296,7 @@ export default {
         const form = new FormData();
         form.set('callback_query_id', callback.id);
         form.set('text', statusText[status] ?? 'This draft still requires editorial review.');
+        if (status === 'checks-unresolved') form.set('show_alert', 'true');
         await botRequest(env, 'answerCallbackQuery', form);
         return new Response(null, { status: 204 });
       }
