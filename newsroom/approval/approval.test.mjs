@@ -134,6 +134,17 @@ test('a trusted submission sends a protected attachment and binds decisions to t
   await callback('webhook-token', 42, 11, 'r');
   assert.equal((await (await post('intake-token')).json()).status, 'approved');
 
+  const heldPacket = { ...packet, headline: 'Unresolved checks', status: 'held-for-editorial-review' };
+  const held = await call('/reviews', 'x-newsroom-intake-token', 'intake-token', heldPacket);
+  assert.equal(held.status, 201);
+  const { revision: heldRevision } = await held.json();
+  assert.deepEqual(JSON.parse(deliveries.at(-1).get('reply_markup')).inline_keyboard[0].map(({ text }) => text),
+    ['Approve', 'Edit', 'Reject']);
+  await callback('webhook-token', 42, 11, 'a', heldRevision);
+  assert.match(responses.at(-1), /^Approval blocked/);
+  await callback('webhook-token', 42, 11, 'e', heldRevision);
+  assert.match(responses.at(-1), /^Edit requested/);
+
   const startStaging = () => call('/staging-reviews', 'x-newsroom-intake-token', 'intake-token', {
     runKey: '123-1', scenario: 'approve',
   });

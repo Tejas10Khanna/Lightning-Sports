@@ -188,7 +188,6 @@ jobs:
           NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
           NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
           NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
-          NEWSROOM_REVIEW_ONLY: 'true'
         run: |
           node newsroom/run.mjs send-for-review newsroom/state/draft.enc
           printf '%s\n' "$(cat "$RUNNER_TEMP/cricket-match-id")" >> newsroom/state/cricket-seen.txt
