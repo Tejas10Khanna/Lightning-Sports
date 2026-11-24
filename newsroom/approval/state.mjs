@@ -21,7 +21,10 @@ export function decide(review, { action, messageId, now }) {
   return review;
 }
 
-export function expireReview(review, now) {
+export function expireReview(review, now, autoPublishEnabled = false) {
   if (review.status !== 'awaiting-decision' || now < review.deadline) return review;
+  if (autoPublishEnabled && review.independentlyVerified && review.factCheckPassed && !review.testOnly) {
+    return { ...review, status: 'approved', decidedAt: now, decision: 'verified-timeout' };
+  }
   return { ...review, status: 'manual-review', expiredAt: now };
 }

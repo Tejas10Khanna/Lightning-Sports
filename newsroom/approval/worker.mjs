@@ -95,13 +95,14 @@ async function botRequest(env, method, body) {
   return result.result;
 }
 
-async function deliver(env, revision, packet, factCheckPassed) {
+async function deliver(env, revision, packet, factCheckPassed, autoPublish) {
   const form = new FormData();
   form.set('chat_id', env.TELEGRAM_CHAT_ID);
   form.set('protect_content', 'true');
   form.set('document', new Blob([reviewDocument(packet)], { type: 'text/plain' }), 'editorial-draft.txt');
   const directions = packet.testOnly ? packet.dek : factCheckPassed
-    ? 'Confirm facts, citations, and rights before approving.' : 'Held for editorial review.';
+    ? (autoPublish ? 'Publishes after five minutes unless you request edits or reject.'
+      : 'Confirm facts, citations, and rights before approving.') : 'Held for editorial review.';
   form.set('caption', packet.sport + ' editorial review\n' + packet.headline + '\n' + directions);
   const buttons = [
     { text: 'Edit', callback_data: 'e:' + revision },
@@ -158,22 +159,25 @@ export class EditorialReview {
     return new Response(null, { status: 404 });
   }
 
-  async submit({ revision, packet }) {
+  async submit({ revision, packet, independentlyVerified = false }) {
     const now = Date.now();
     const factCheckPassed = allChecksPassed(packet);
     const testOnly = packet.testOnly === true;
+    const autoPublish = independentlyVerified && this.env.NEWSROOM_TIMEOUT_PUBLISH_ENABLED === 'true' &&
+      this.env.NEWSROOM_PUBLISH_ENABLED === 'true';
     const article = factCheckPassed && !testOnly ? prepareArticle(packet, revision, now) : undefined;
     const reservation = await this.storage.transaction(async (tx) => {
       const original = await tx.get('review');
       if (original && (original.status !== 'delivering' || original.reservedAt > now - 30_000)) return original;
-      const review = { revision, status: 'delivering', reservedAt: now, factCheckPassed, testOnly };
+      const review = { revision, status: 'delivering', reservedAt: now, factCheckPassed, testOnly,
+        independentlyVerified: autoPublish };
       await tx.put('review', review);
       return null;
     });
     if (reservation) return Response.json({ revision, status: reservation.status });
     let messageId;
     try {
-      messageId = await deliver(this.env, revision, packet, factCheckPassed);
+      messageId = await deliver(this.env, revision, packet, factCheckPassed, autoPublish);
     } catch (error) {
       const reason = deliveryReasons.has(error?.message) ? error.message : 'telegram-delivery-failed';
       return Response.json({ reason }, { status: 503 });
@@ -190,10 +194,14 @@ export class EditorialReview {
   }
 
   async alarm() {
+    const autoPublish = this.env.NEWSROOM_TIMEOUT_PUBLISH_ENABLED === 'true' &&
+      this.env.NEWSROOM_PUBLISH_ENABLED === 'true';
     const review = await this.storage.transaction(async (tx) => {
       const original = await tx.get('review');
       if (!original) return null;
-      const updated = expireReview(original, Date.now());
+      const updated = original.status === 'approved' && original.decision === 'verified-timeout' && !autoPublish
+        ? { ...original, status: 'manual-review', expiredAt: Date.now() }
+        : expireReview(original, Date.now(), autoPublish);
       if (updated !== original) await tx.put('review', updated);
       return updated;
     });
@@ -253,11 +261,14 @@ export default {
             return Response.json({ reason: 'private-chat-bindings-invalid' }, { status: 503 });
           }
         }
+        // Only an independent verifier may attest that this exact submission cleared its evidence and rights checks.
+        const independentlyVerified = path === '/reviews' && !packet.testOnly && await sameSecret(
+          request.headers.get('x-newsroom-verifier-token'), env.NEWSROOM_VERIFIER_TOKEN);
         const digest = await crypto.subtle.digest('SHA-256', encoder.encode(JSON.stringify(packet)));
         const revision = Array.from(new Uint8Array(digest).subarray(0, 16),
           (byte) => byte.toString(16).padStart(2, '0')).join('');
         return await reviewStub(env, revision).fetch('https://review.internal/submit', {
-          method: 'POST', body: JSON.stringify({ revision, packet }),
+          method: 'POST', body: JSON.stringify({ revision, packet, independentlyVerified }),
         });
       }
       if (path === '/telegram') {
