@@ -168,6 +168,8 @@ def select(archive, seen, today, max_age_days=2):
     picks = []
     with zipfile.ZipFile(archive) as bundle:
         members = bundle.infolist()
+        latest_date = None
+        scorecards = 0
         if len(members) > 200:
             raise ValueError("Cricsheet archive contains too many entries.")
         for entry in members:
@@ -178,11 +180,17 @@ def select(archive, seen, today, max_age_days=2):
             if match_id in seen:
                 continue
             try:
-                pick = candidate(match_id, json.loads(bundle.read(entry)), today, max_age_days)
+                match = json.loads(bundle.read(entry))
+                match_date = dt.date.fromisoformat(match["info"]["dates"][-1])
+                scorecards += 1
+                latest_date = max(latest_date or match_date, match_date)
+                pick = candidate(match_id, match, today, max_age_days)
             except (KeyError, IndexError, ValueError, TypeError, StopIteration, AttributeError):
                 continue
             if pick:
                 picks.append(pick)
+        print(f"Cricsheet archive: {scorecards} readable unprocessed scorecards, latest date "
+              f"{latest_date or 'none'}, {len(picks)} eligible within {max_age_days} days.")
     return max(picks, key=lambda row: row[:3], default=None)
 
 
