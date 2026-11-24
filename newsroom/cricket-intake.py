@@ -65,6 +65,24 @@ def report_comparison(match_date, expected=None):
         return
     opener = urllib.request.build_opener(NoRedirect())
 
+    def error_status(error):
+        code = f"HTTP {error.code}"
+        if not error.headers or error.headers.get_content_type() != "application/json":
+            return code + " (non-JSON response)"
+        try:
+            body = json.loads(error.read(8192))
+            detail = body.get("error")
+            reason = detail.get("code") if isinstance(detail, dict) else detail
+            if reason in (
+                "unauthorized", "forbidden", "invalid_key", "invalid_api_key", "missing_api_key",
+                "endpoint_not_in_plan", "history_not_in_plan", "rate_limited", "quota_exceeded",
+                "bad_request", "upstream_unavailable",
+            ):
+                return f"{code} ({reason})"
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+        return code + " (JSON response without a recognized error code)"
+
     def fetch(path):
         request = urllib.request.Request("https://api.datasportsapi.com/v2" + path, headers={
             "Authorization": "Bearer " + key, "Accept": "application/json",
@@ -83,7 +101,7 @@ def report_comparison(match_date, expected=None):
         else:
             status = compare_scorecard(match_date, expected, fetch)
     except urllib.error.HTTPError as error:
-        status = f"provider HTTP {error.code}"
+        status = "provider " + error_status(error)
         if error.code in {401, 403}:
             query = urllib.parse.urlencode({"sport": "football", "date": match_date, "page": 0})
             try:
@@ -91,7 +109,7 @@ def report_comparison(match_date, expected=None):
                 if isinstance(control.get("data"), list):
                     status += "; football control accepted"
             except urllib.error.HTTPError as control_error:
-                status += f"; football control HTTP {control_error.code}"
+                status += "; football control " + error_status(control_error)
             except (OSError, ValueError, TypeError, AttributeError):
                 status += "; football control unavailable"
     except (OSError, KeyError, ValueError, TypeError, AttributeError):
