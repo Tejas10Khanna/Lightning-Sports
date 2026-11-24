@@ -6,6 +6,7 @@ on:
     paths:
       - 'newsroom/cricket-intake.py'
       - 'newsroom/cricket-database-intake.py'
+      - 'newsroom/football-intake.mjs'
       - 'newsroom/run.mjs'
       - '.github/workflows/newsroom.yml'
   pull_request:
@@ -18,7 +19,7 @@ on:
         description: Newsroom stage to run
         type: choice
         default: intake
-        options: [intake, draft, groq-test, telegram-test, cricket-intake, cricket-provider-check]
+        options: [intake, draft, groq-test, telegram-test, cricket-intake, cricket-provider-check, football-intake]
       public_brief:
         description: Optional draft brief JSON using public facts only. Use the secret for private briefs.
         type: string
@@ -38,6 +39,7 @@ on:
         options: [approve, edit, reject, timeout]
   schedule:
     - cron: '17 * * * *'
+    - cron: '37 0,6,12,18 * * *'
 
 permissions:
   contents: read
@@ -66,7 +68,7 @@ jobs:
         run: npx --yes wrangler@4.166.0 deploy --dry-run --config approval/wrangler.toml
 
   collect:
-    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || ((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_ENABLED != 'false'))
+    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || (((github.event_name == 'schedule' && github.event.schedule == '17 * * * *') || github.event_name == 'push') && vars.NEWSROOM_ENABLED != 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -143,7 +145,7 @@ jobs:
           fi
 
   cricket-intake:
-    if: github.ref == 'refs/heads/main' && (((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
+    if: github.ref == 'refs/heads/main' && ((((github.event_name == 'schedule' && github.event.schedule == '17 * * * *') || github.event_name == 'push') && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -199,6 +201,72 @@ jobs:
         with:
           path: newsroom/state/cricket-seen.txt
           key: newsroom-cricket-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+  football-intake:
+    if: github.ref == 'refs/heads/main' && ((((github.event_name == 'schedule' && github.event.schedule == '37 0,6,12,18 * * *') || github.event_name == 'push') && vars.NEWSROOM_FOOTBALL_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'football-intake'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: newsroom-football-intake
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Restore previously delivered match IDs
+        uses: actions/cache/restore@v6
+        with:
+          path: newsroom/state/football-seen.txt
+          key: newsroom-football-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: newsroom-football-seen-v1-
+      - name: Select a finished Bundesliga match and build an evidence brief
+        id: scorecard
+        env:
+          NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
+        run: |
+          if [[ "${NEWSROOM_APPROVAL_URL%/}" != 'https://lightning-sports-editorial-review.tejaskhanna15.workers.dev' ]]; then
+            echo "::notice::Football intake is waiting for the editorial Worker URL."
+            exit 0
+          fi
+          if ! curl -fsS --max-time 10 "${NEWSROOM_APPROVAL_URL%/}/health" | jq -e '.version == "openligadb-attribution"' >/dev/null; then
+            echo "::warning::Football intake is waiting for the Worker deployment that adds OpenLigaDB attribution."
+            exit 0
+          fi
+          mkdir -p newsroom/state
+          node newsroom/football-intake.mjs newsroom/state/football-seen.txt "$RUNNER_TEMP/football-brief.json" "$RUNNER_TEMP/football-match-id"
+          if [[ -f "$RUNNER_TEMP/football-match-id" ]]; then
+            echo 'selected=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Draft and check the selected football editorial
+        if: steps.scorecard.outputs.selected == 'true'
+        env:
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+          NEWSROOM_GROQ_API_KEY: ${{ secrets.NEWSROOM_GROQ_API_KEY }}
+        run: |
+          npm ci --prefix newsroom --ignore-scripts --no-audit --no-fund
+          export NEWSROOM_PUBLIC_BRIEF="$(cat "$RUNNER_TEMP/football-brief.json")"
+          node newsroom/run.mjs draft
+      - name: Send the editorial for private review
+        if: steps.scorecard.outputs.selected == 'true'
+        env:
+          NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
+          NEWSROOM_INTAKE_TOKEN: ${{ secrets.NEWSROOM_INTAKE_TOKEN }}
+          NEWSROOM_REPORT_KEY: ${{ secrets.NEWSROOM_REPORT_KEY }}
+        run: |
+          node newsroom/run.mjs send-for-review newsroom/state/draft.enc
+          printf '%s\n' "$(cat "$RUNNER_TEMP/football-match-id")" >> newsroom/state/football-seen.txt
+          tail -n 1000 newsroom/state/football-seen.txt > "$RUNNER_TEMP/football-seen.txt"
+          mv "$RUNNER_TEMP/football-seen.txt" newsroom/state/football-seen.txt
+      - name: Save processed match IDs
+        if: steps.scorecard.outputs.selected == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: newsroom/state/football-seen.txt
+          key: newsroom-football-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
   draft:
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.stage == 'draft'

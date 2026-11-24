@@ -237,6 +237,11 @@ function reviewStub(env, id) {
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
+    if (request.method === 'GET' && path === '/health') {
+      return Response.json({ service: 'editorial-review', version: 'openligadb-attribution' }, {
+        headers: { 'cache-control': 'no-store' },
+      });
+    }
     try {
       const statusPath = /^\/reviews\/([0-9a-f]{32})$/.exec(path);
       if (request.method === 'GET' && statusPath) {
