@@ -39,6 +39,7 @@ on:
         options: [approve, edit, reject, timeout]
   schedule:
     - cron: '17 * * * *'
+    - cron: '37 0,6,12,18 * * *'
 
 permissions:
   contents: read
@@ -67,7 +68,7 @@ jobs:
         run: npx --yes wrangler@4.166.0 deploy --dry-run --config approval/wrangler.toml
 
   collect:
-    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || ((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_ENABLED != 'false'))
+    if: github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.stage == 'intake') || (((github.event_name == 'schedule' && github.event.schedule == '17 * * * *') || github.event_name == 'push') && vars.NEWSROOM_ENABLED != 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -144,7 +145,7 @@ jobs:
           fi
 
   cricket-intake:
-    if: github.ref == 'refs/heads/main' && (((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
+    if: github.ref == 'refs/heads/main' && ((((github.event_name == 'schedule' && github.event.schedule == '17 * * * *') || github.event_name == 'push') && vars.NEWSROOM_CRICKET_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'cricket-intake'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -202,7 +203,7 @@ jobs:
           key: newsroom-cricket-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
   football-intake:
-    if: github.ref == 'refs/heads/main' && (((github.event_name == 'schedule' || github.event_name == 'push') && vars.NEWSROOM_FOOTBALL_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'football-intake'))
+    if: github.ref == 'refs/heads/main' && ((((github.event_name == 'schedule' && github.event.schedule == '37 0,6,12,18 * * *') || github.event_name == 'push') && vars.NEWSROOM_FOOTBALL_INTAKE != 'false') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'football-intake'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
@@ -224,7 +225,17 @@ jobs:
           restore-keys: newsroom-football-seen-v1-
       - name: Select a finished Bundesliga match and build an evidence brief
         id: scorecard
+        env:
+          NEWSROOM_APPROVAL_URL: ${{ vars.NEWSROOM_APPROVAL_URL }}
         run: |
+          if [[ "${NEWSROOM_APPROVAL_URL%/}" != 'https://lightning-sports-editorial-review.tejaskhanna15.workers.dev' ]]; then
+            echo "::notice::Football intake is waiting for the editorial Worker URL."
+            exit 0
+          fi
+          if ! curl -fsS --max-time 10 "${NEWSROOM_APPROVAL_URL%/}/health" | jq -e '.version == "openligadb-attribution"' >/dev/null; then
+            echo "::warning::Football intake is waiting for the Worker deployment that adds OpenLigaDB attribution."
+            exit 0
+          fi
           mkdir -p newsroom/state
           node newsroom/football-intake.mjs newsroom/state/football-seen.txt "$RUNNER_TEMP/football-brief.json" "$RUNNER_TEMP/football-match-id"
           if [[ -f "$RUNNER_TEMP/football-match-id" ]]; then
